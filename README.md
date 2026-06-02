@@ -24,6 +24,22 @@ Built with **Expo SDK 56** (React Native 0.85, React 19, expo-router).
   <img src="screenshots/6.jpeg" width="30%" alt="Tasks screen listing scheduled Odysseus jobs with their cron schedules" />
 </p>
 
+## Install
+
+### iOS — TestFlight
+
+1. Install Apple's **[TestFlight](https://apps.apple.com/app/testflight/id899247664)** app.
+2. Open **[testflight.apple.com/join/qWq1A51n](https://testflight.apple.com/join/qWq1A51n)** and tap *Install*.
+
+### Android — APK
+
+Download **[`odysseus-mobile-v1.0.0.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/latest)**
+from the latest release and install it (allow *install from unknown sources* if
+prompted).
+
+> Either way, you'll need an Odysseus server on your LAN with the companion
+> bridge — see [Prerequisites](#prerequisites) and [Pairing](#pairing) below.
+
 ## A note to the community (and to PewDiePie) 🙏
 
 Huge thanks to **PewDiePie** for building and open-sourcing
