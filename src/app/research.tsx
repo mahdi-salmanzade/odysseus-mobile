@@ -213,7 +213,13 @@ export default function ResearchScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <View style={styles.bar} />
           <View style={styles.bar} />
           <View style={styles.bar} />
@@ -279,7 +285,13 @@ export default function ResearchScreen() {
                 ))
               )}
             </ScrollView>
-            <Pressable onPress={onCancel} disabled={cancelling} style={styles.cancelBtn}>
+            <Pressable
+              onPress={onCancel}
+              disabled={cancelling}
+              style={styles.cancelBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel research"
+            >
               <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel run'}</Text>
             </Pressable>
           </View>
@@ -298,6 +310,8 @@ export default function ResearchScreen() {
                     key={`${s.url}-${i}`}
                     style={styles.sourceRow}
                     onPress={() => s.url && Linking.openURL(s.url).catch(() => {})}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Open source: ${s.title || s.url}`}
                   >
                     <Text style={styles.sourceTitle} numberOfLines={1}>
                       {s.title || s.url}

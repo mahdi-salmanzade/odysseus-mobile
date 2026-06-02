@@ -170,10 +170,22 @@ export default function SessionsScreen() {
 
           {!editing && (
             <View style={styles.actions}>
-              <Pressable hitSlop={8} style={styles.actionBtn} onPress={() => startRename(item)}>
+              <Pressable
+                hitSlop={8}
+                style={styles.actionBtn}
+                onPress={() => startRename(item)}
+                accessibilityRole="button"
+                accessibilityLabel="Rename session"
+              >
                 <Text style={styles.actionText}>Rename</Text>
               </Pressable>
-              <Pressable hitSlop={8} style={styles.actionBtn} onPress={() => confirmDelete(item)}>
+              <Pressable
+                hitSlop={8}
+                style={styles.actionBtn}
+                onPress={() => confirmDelete(item)}
+                accessibilityRole="button"
+                accessibilityLabel="Delete session"
+              >
                 <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
               </Pressable>
             </View>
@@ -187,7 +199,13 @@ export default function SessionsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <Text style={styles.hamburgerText}>≡</Text>
         </Pressable>
         <Text style={styles.title}>Sessions</Text>

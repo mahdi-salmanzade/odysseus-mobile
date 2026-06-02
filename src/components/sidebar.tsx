@@ -132,6 +132,7 @@ export function Sidebar() {
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={closeSidebar}
+        accessibilityRole="button"
         accessibilityLabel="Close menu"
       >
         <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />

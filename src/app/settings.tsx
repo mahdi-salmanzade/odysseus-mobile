@@ -144,7 +144,12 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Pressable hitSlop={12} onPress={() => router.back()}>
+        <Pressable
+          hitSlop={12}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
           <Text style={styles.close}>Done</Text>
         </Pressable>
       </View>
@@ -211,7 +216,7 @@ export default function SettingsScreen() {
           Get a push when research finishes or a new memory, note, or document is saved.
         </Text>
 
-        <Pressable style={styles.danger} onPress={confirmUnpair}>
+        <Pressable style={styles.danger} onPress={confirmUnpair} accessibilityRole="button">
           <Text style={styles.dangerText}>Unpair</Text>
         </Pressable>
 

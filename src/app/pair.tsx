@@ -136,7 +136,11 @@ export default function PairScreen() {
             }
           />
 
-          <Pressable style={styles.linkRow} onPress={() => Linking.openURL(ODYSSEUS_REPO)}>
+          <Pressable
+            style={styles.linkRow}
+            onPress={() => Linking.openURL(ODYSSEUS_REPO)}
+            accessibilityRole="link"
+          >
             <Text style={styles.linkText}>Open the Odysseus repo →</Text>
           </Pressable>
         </ScrollView>
@@ -154,7 +158,12 @@ export default function PairScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Pressable hitSlop={12} onPress={() => setShowPairing(false)}>
+          <Pressable
+            hitSlop={12}
+            onPress={() => setShowPairing(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
             <Text style={styles.back}>‹</Text>
           </Pressable>
           <OdysseusLogo size={28} />
@@ -238,7 +247,12 @@ function CodeBlock({ lines }: { lines: string[] }) {
 
 function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <Pressable style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
+    <Pressable
+      style={[styles.tab, active && styles.tabActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </Pressable>
   );

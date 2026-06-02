@@ -150,17 +150,24 @@ export default function MemoryScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <View style={styles.bar} />
           <View style={styles.bar} />
           <View style={styles.bar} />
         </Pressable>
         <Text style={styles.title}>Memory</Text>
         <Pressable
-          hitSlop={12}
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
           onPress={() => setComposing((v) => !v)}
           style={styles.addBtn}
-          accessibilityLabel={composing ? 'Close composer' : 'Add memory'}
+          accessibilityRole="button"
+          accessibilityLabel={composing ? 'Close composer' : 'New memory'}
         >
           <Text style={styles.addBtnText}>{composing ? '×' : '+'}</Text>
         </Pressable>
@@ -188,6 +195,8 @@ export default function MemoryScreen() {
                   key={c}
                   onPress={() => setCategory(c)}
                   style={[styles.catChip, category === c && styles.catChipOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: category === c }}
                 >
                   <Text style={[styles.catChipText, category === c && styles.catChipTextOn]}>
                     {c}
@@ -199,6 +208,7 @@ export default function MemoryScreen() {
               onPress={save}
               disabled={!draft.trim() || saving}
               style={[styles.saveBtn, (!draft.trim() || saving) && styles.saveBtnOff]}
+              accessibilityRole="button"
             >
               {saving ? (
                 <ActivityIndicator color={theme.color.bg} />

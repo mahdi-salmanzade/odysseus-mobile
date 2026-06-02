@@ -39,8 +39,6 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.INTERNET",
-        "android.permission.CAMERA",
         "android.permission.INTERNET"
       ]
     },
@@ -54,7 +52,7 @@
       [
         "expo-notifications",
         {
-          "color": "#7c9cff"
+          "color": "#e06c75"
         }
       ],
       [

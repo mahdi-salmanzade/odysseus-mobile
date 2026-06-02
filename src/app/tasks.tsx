@@ -57,7 +57,13 @@ export default function TasksScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <View style={styles.bar} />
           <View style={styles.bar} />
           <View style={styles.bar} />

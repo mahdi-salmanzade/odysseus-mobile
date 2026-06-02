@@ -52,7 +52,7 @@ const newRowId = () => `r${++_rowSeq}`;
 
 // Shown in the assistant bubble while a background research task runs — research
 // streams no answer text (the report lands in history when it finishes).
-const RESEARCHING = '🔎 Researching the web… this can take a minute.';
+const RESEARCHING = 'Researching the web… this can take a minute.';
 
 /** Open a URL only if it's http(s). Source URLs come from the server/LLM, i.e.
  * untrusted output — don't hand arbitrary schemes (tel:, custom deep links) to
@@ -329,8 +329,8 @@ export default function ChatScreen() {
       // failure is never silently swallowed as a truncated-but-clean answer.
       updateAssistant((cur) =>
         cur.content && cur.content !== RESEARCHING
-          ? { ...cur, content: `${cur.content}\n\n⚠️ ${msg}` }
-          : { ...cur, content: `⚠️ ${msg}` },
+          ? { ...cur, content: `${cur.content}\n\n${msg}` }
+          : { ...cur, content: `${msg}` },
       );
     };
 
@@ -395,13 +395,13 @@ export default function ChatScreen() {
                 const report = [...hist].reverse().find((m) => m.role === 'assistant')?.content;
                 updateAssistant((cur) => ({
                   ...cur,
-                  content: report || '⚠️ Research finished but returned no report.',
+                  content: report || 'Research finished but returned no report.',
                 }));
                 scrollToEnd();
               } catch {
                 updateAssistant((cur) => ({
                   ...cur,
-                  content: '⚠️ Research finished, but the report could not be loaded.',
+                  content: 'Research finished, but the report could not be loaded.',
                 }));
               }
             })();
@@ -411,8 +411,8 @@ export default function ChatScreen() {
             settle();
             updateAssistant((cur) =>
               cur.content && cur.content !== RESEARCHING
-                ? { ...cur, content: `${cur.content}\n\n⚠️ ${err.message}` }
-                : { ...cur, content: `⚠️ ${err.message}` },
+                ? { ...cur, content: `${cur.content}\n\n${err.message}` }
+                : { ...cur, content: `${err.message}` },
             );
           },
         },
@@ -454,7 +454,13 @@ export default function ChatScreen() {
       </GestureDetector>
 
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <MenuIcon size={23} color={theme.color.textDim} />
         </Pressable>
         <View style={styles.headerCenter}>
@@ -467,7 +473,7 @@ export default function ChatScreen() {
           </Text>
         </View>
         <Link href="/settings" asChild>
-          <Pressable hitSlop={12}>
+          <Pressable hitSlop={12} accessibilityRole="button" accessibilityLabel="Open settings">
             <SettingsIcon size={22} color={theme.color.textDim} />
           </Pressable>
         </Link>
@@ -513,6 +519,7 @@ export default function ChatScreen() {
                   setConvoError(null);
                   setConvoReload((n) => n + 1);
                 }}
+                accessibilityRole="button"
               >
                 <Text style={styles.bannerRetry}>Retry</Text>
               </Pressable>
@@ -646,7 +653,9 @@ function Sources({ sources }: { sources: ChatSources }) {
             <Pressable
               key={`${s.url}-${i}`}
               onPress={() => openExternal(s.url)}
-              hitSlop={4}
+              hitSlop={11}
+              accessibilityRole="link"
+              accessibilityLabel={`Open source ${i + 1}: ${s.title || s.url}`}
             >
               <Text style={styles.sourceLink} numberOfLines={2}>
                 {i + 1}. {s.title || s.url}
@@ -661,7 +670,7 @@ function Sources({ sources }: { sources: ChatSources }) {
           <Text style={styles.sourcesLabel}>Documents</Text>
           {sources.rag.map((d, i) => (
             <Text key={`${d.filename}-${i}`} style={styles.sourceDoc} numberOfLines={1}>
-              📄 {d.filename}
+              {d.filename}
             </Text>
           ))}
         </>
@@ -669,7 +678,7 @@ function Sources({ sources }: { sources: ChatSources }) {
 
       {sources.memories && sources.memories.length > 0 && (
         <Text style={styles.sourceMeta}>
-          🧠 {sources.memories.length} {sources.memories.length === 1 ? 'memory' : 'memories'} used
+          {sources.memories.length} {sources.memories.length === 1 ? 'memory' : 'memories'} used
         </Text>
       )}
     </View>

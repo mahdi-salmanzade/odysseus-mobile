@@ -215,17 +215,24 @@ export default function NotesScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} onPress={openSidebar} style={styles.hamburger}>
+        <Pressable
+          hitSlop={12}
+          onPress={openSidebar}
+          style={styles.hamburger}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <View style={styles.bar} />
           <View style={styles.bar} />
           <View style={styles.bar} />
         </Pressable>
         <Text style={styles.title}>Notes</Text>
         <Pressable
-          hitSlop={12}
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
           onPress={() => setComposing((v) => !v)}
           style={styles.addBtn}
-          accessibilityLabel={composing ? 'Close composer' : 'Add note'}
+          accessibilityRole="button"
+          accessibilityLabel={composing ? 'Close composer' : 'New note'}
         >
           <Text style={styles.addBtnText}>{composing ? '×' : '+'}</Text>
         </Pressable>
@@ -257,9 +264,11 @@ export default function NotesScreen() {
               <Pressable
                 onPress={() => setChecklist((v) => !v)}
                 style={[styles.modeChip, checklist && styles.modeChipOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: checklist }}
               >
                 <Text style={[styles.modeChipText, checklist && styles.modeChipTextOn]}>
-                  ☑ Checklist
+                  Checklist
                 </Text>
               </Pressable>
               <Pressable
@@ -269,6 +278,7 @@ export default function NotesScreen() {
                   styles.saveBtn,
                   (!title.trim() && !body.trim()) || saving ? styles.saveBtnOff : null,
                 ]}
+                accessibilityRole="button"
               >
                 {saving ? (
                   <ActivityIndicator color={theme.color.bg} />
@@ -334,7 +344,13 @@ function NoteCard({
   return (
     <Pressable style={styles.card} onLongPress={onDelete} delayLongPress={350}>
       <View style={styles.cardHead}>
-        <Pressable hitSlop={10} onPress={onTogglePin}>
+        <Pressable
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+          onPress={onTogglePin}
+          accessibilityRole="button"
+          accessibilityLabel={note.pinned ? 'Unpin note' : 'Pin note'}
+          accessibilityState={{ selected: !!note.pinned }}
+        >
           <Text style={[styles.pin, !note.pinned && styles.pinOff]}>
             {note.pinned ? '●' : '○'}
           </Text>
@@ -352,8 +368,11 @@ function NoteCard({
             <Pressable
               key={i}
               style={styles.checkRow}
-              hitSlop={4}
+              hitSlop={11}
               onPress={() => onToggleItem(i)}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle item"
+              accessibilityState={{ checked: it.done }}
             >
               <Text style={[styles.check, it.done && styles.checkDone]}>
                 {it.done ? '✓' : '○'}
