@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { setUnauthorizedHandler } from '@/lib/api';
 import { clearPairing, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
+import { disablePushForPairing, enablePushForPairing } from '@/lib/push';
 
 interface PairingContextValue {
   pairing: Pairing | null;
@@ -45,8 +46,14 @@ export function PairingProvider({ children }: { children: ReactNode }) {
       pair: async (p) => {
         await savePairing(p);
         setPairing(p);
+        // Offer push as soon as we're paired. Fire-and-forget: a denied prompt
+        // or push-less device must not delay landing on the chat screen.
+        void enablePushForPairing(p);
       },
       unpair: async () => {
+        // Best-effort: tell the server to forget this device before the token
+        // goes away, so it doesn't keep a stale push target.
+        if (pairing) await disablePushForPairing(pairing);
         await clearPairing();
         setPairing(null);
       },

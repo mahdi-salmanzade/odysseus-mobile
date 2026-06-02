@@ -20,10 +20,12 @@ import {
   flattenModels,
   getInfo,
   listModels,
+  sendTestPush,
   type CompanionInfo,
   type ModelChoice,
 } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
+import { enablePushForPairing } from '@/lib/push';
 import { loadModelPref, saveModelPref, type ModelPref } from '@/lib/prefs';
 
 // App version + native build number, read from the embedded app config. With
@@ -46,6 +48,7 @@ export default function SettingsScreen() {
   const [models, setModels] = useState<ModelChoice[] | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ModelPref | null>(null);
+  const [testingPush, setTestingPush] = useState(false);
 
   useEffect(() => {
     if (!pairing) return;
@@ -83,6 +86,34 @@ export default function SettingsScreen() {
     setSelected(pref);
     await saveModelPref(pref);
     Haptics.selectionAsync().catch(() => {});
+  }
+
+  async function testPush() {
+    if (!pairing || testingPush) return;
+    setTestingPush(true);
+    try {
+      // Make sure this device is registered (prompts for permission the first
+      // time), then ask the server to push a test to all of the owner's devices.
+      const ready = await enablePushForPairing(pairing);
+      if (!ready) {
+        Alert.alert(
+          'Notifications unavailable',
+          'Allow notifications for Odysseus in system settings, on a physical device, then try again.',
+        );
+        return;
+      }
+      const sent = await sendTestPush(pairing);
+      if (sent > 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Alert.alert('Test sent', `Pushed a test notification to ${sent} device${sent === 1 ? '' : 's'}.`);
+      } else {
+        Alert.alert('No devices registered', 'This device isn’t registered for push yet.');
+      }
+    } catch (e) {
+      Alert.alert('Could not send', e instanceof ApiError ? e.message : 'Something went wrong.');
+    } finally {
+      setTestingPush(false);
+    }
   }
 
   function confirmUnpair() {
@@ -163,6 +194,22 @@ export default function SettingsScreen() {
           )}
         </View>
         <Text style={styles.hint}>The selected model is used for new chats.</Text>
+
+        <Text style={styles.section}>Notifications</Text>
+        <View style={styles.card}>
+          <Pressable
+            style={[styles.modelRow, styles.rowLast]}
+            onPress={testPush}
+            disabled={testingPush}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.modelLabel, styles.modelLabelOn]}>Send a test notification</Text>
+            {testingPush ? <ActivityIndicator color={theme.color.accent} /> : <Text style={styles.check}>→</Text>}
+          </Pressable>
+        </View>
+        <Text style={styles.hint}>
+          Get a push when research finishes or a new memory, note, or document is saved.
+        </Text>
 
         <Pressable style={styles.danger} onPress={confirmUnpair}>
           <Text style={styles.dangerText}>Unpair</Text>

@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Sidebar } from '@/components/sidebar';
 import { theme } from '@/constants/theme';
 import { PairingProvider, usePairing } from '@/lib/pairing-context';
+import { setupNotificationTapHandler } from '@/lib/push';
 import { SidebarProvider } from '@/lib/sidebar-context';
 
 // Keep the native splash up until we've read the keychain, so an already-paired
@@ -22,6 +23,9 @@ function RootNavigator() {
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
+
+  // Route notification taps to the relevant screen, app-wide.
+  useEffect(() => setupNotificationTapHandler(), []);
 
   // Until then, paint the splash-colored background ourselves rather than
   // returning null — returning null would rely on the native splash still

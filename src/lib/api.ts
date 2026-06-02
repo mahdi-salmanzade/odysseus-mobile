@@ -170,6 +170,43 @@ export async function listModels(p: Pairing): Promise<ModelEndpoint[]> {
   return data.endpoints ?? [];
 }
 
+// ---------------------------------------------------------------------------
+// Mobile push (companion bridge /api/companion/push/*).
+//
+// The phone registers its Expo push token so the server can deliver
+// owner-scoped lifecycle events (research done, etc.) as native notifications.
+// The token is a device handle, not a credential; the server stores it under
+// the paired token's owner.
+// ---------------------------------------------------------------------------
+
+/** Register this device's Expo push token with the paired server. */
+export async function registerPushToken(p: Pairing, token: string): Promise<void> {
+  const res = await request(p, '/api/companion/push/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
+}
+
+/** Drop this device's Expo push token (e.g. on unpair). */
+export async function unregisterPushToken(p: Pairing, token: string): Promise<void> {
+  const res = await request(p, '/api/companion/push/unregister', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
+}
+
+/** Ask the server to push a test notification to this owner's devices. Returns
+ *  the number of devices it targeted (0 if none are registered). */
+export async function sendTestPush(p: Pairing): Promise<number> {
+  const res = await request(p, '/api/companion/push/test', { method: 'POST' });
+  const data = await json<{ ok: boolean; sent: number }>(res);
+  return data.sent ?? 0;
+}
+
 /** Flatten endpoints → individual selectable (endpoint, model) choices. */
 export function flattenModels(endpoints: ModelEndpoint[]): ModelChoice[] {
   const out: ModelChoice[] = [];

@@ -52,6 +52,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "color": "#7c9cff"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Odysseus uses the camera to scan the pairing QR code shown by your Odysseus server.",
