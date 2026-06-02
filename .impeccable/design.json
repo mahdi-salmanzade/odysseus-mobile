@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-02T00:00:00Z",
+  "title": "Design System: Odysseus Mobile",
+  "extensions": {
+    "colorMeta": {
+      "bg": { "role": "neutral", "displayName": "Desk Black", "canonical": "#16161a", "tonalRamp": ["#0e0e11", "#16161a", "#1f1f25", "#26262e", "#33333d", "#4a4a57", "#6c6c7c", "#9a9aa8", "#c7c7d1", "#e8e8ee"] },
+      "surface": { "role": "neutral", "displayName": "Slate Surface", "canonical": "#1f1f25", "tonalRamp": ["#16161a", "#1f1f25", "#26262e", "#2c2c35", "#383843", "#4a4a57", "#6c6c7c", "#9a9aa8", "#c7c7d1", "#e8e8ee"] },
+      "accent": { "role": "primary", "displayName": "Ember Coral", "canonical": "#e06c75", "tonalRamp": ["#2a1518", "#3d1d22", "#552830", "#723640", "#9e4d54", "#e06c75", "#e88f96", "#efb1b6", "#f6d3d6", "#fbeaec"] },
+      "accent-dim": { "role": "primary", "displayName": "Ember Dim", "canonical": "#9e4d54", "tonalRamp": ["#2a1518", "#3d1d22", "#552830", "#723640", "#9e4d54", "#bf5f67", "#d97e85", "#e7a3a8", "#f1c8cb", "#f9e6e7"] },
+      "user-bubble": { "role": "secondary", "displayName": "Hearth Coals", "canonical": "#5a2f37", "tonalRamp": ["#1f1014", "#2e171d", "#3f1f26", "#5a2f37", "#7a4049", "#9a545d", "#b97179", "#d29aa0", "#e6c3c7", "#f3e3e5"] },
+      "text": { "role": "neutral", "displayName": "Lamplit White", "canonical": "#e8e8e8", "tonalRamp": ["#2c2c35", "#3a3a44", "#52525f", "#6c6c7c", "#8a8a96", "#bdbdc7", "#d4d4dc", "#e8e8e8", "#f2f2f5", "#fafafb"] },
+      "danger": { "role": "status", "displayName": "Warm Alarm", "canonical": "#e0685e", "tonalRamp": ["#3a1f1f", "#5a2b28", "#7d3934", "#a64a43", "#c75a51", "#e0685e", "#e98a82", "#f1aaa4", "#f7cbc7", "#fbe6e3"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The pairing screen headline only; the one moment the app introduces itself." },
+      "title": { "displayName": "Title", "purpose": "Screen headers and the Odysseus wordmark." },
+      "body": { "displayName": "Body", "purpose": "Message text and list content; the workhorse." },
+      "label": { "displayName": "Label", "purpose": "Toggle text, field labels, metadata, nav labels." },
+      "mono": { "displayName": "Mono", "purpose": "Host, port, token, payload, and inline code; reads as a literal machine value." }
+    },
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Sidebar slide-in and primary transitions. Decisive, no bounce." },
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Toggle and small state changes." },
+      { "name": "duration-open", "value": "240ms", "purpose": "Sidebar open." },
+      { "name": "duration-close", "value": "200ms", "purpose": "Sidebar close. All sidebar motion honors prefers-reduced-motion (ReduceMotion.System)." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "0px" },
+      { "name": "tablet", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Send Button",
+      "kind": "button",
+      "refersTo": "button-send",
+      "description": "The single brightest ember on the chat screen; the one live action.",
+      "html": "<button class=\"ds-send\" aria-label=\"Send\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0e0e12\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"19\" x2=\"12\" y2=\"5\"/><polyline points=\"5 12 12 5 19 12\"/></svg></button>",
+      "css": ".ds-send { width: 42px; height: 42px; border: none; border-radius: 999px; background: #e06c75; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 160ms cubic-bezier(0.25,1,0.5,1), background 160ms; } .ds-send:hover { transform: translateY(-1px); } .ds-send:active { background: #e88f96; } .ds-send:disabled { opacity: 0.4; }"
+    },
+    {
+      "name": "Toggle Chip",
+      "kind": "chip",
+      "refersTo": "toggle",
+      "description": "Composer toggles (Web / Research / Agent). Active = warm Ember Dim fill under an Ember Coral border.",
+      "html": "<button class=\"ds-toggle\">Web</button><button class=\"ds-toggle ds-toggle--on\">Research</button>",
+      "css": ".ds-toggle { font: 600 13px/1.3 system-ui, -apple-system, Roboto; color: #bdbdc7; background: #1f1f25; border: 1px solid #2c2c35; border-radius: 999px; padding: 6px 12px; cursor: pointer; transition: background 160ms cubic-bezier(0.25,1,0.5,1), color 160ms, border-color 160ms; } .ds-toggle:hover { color: #e8e8e8; } .ds-toggle--on { background: #9e4d54; border-color: #e06c75; color: #e8e8e8; }"
+    },
+    {
+      "name": "Composer Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The message field. Slate Surface fill, hairline border, quiet focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Message Odysseus…\" />",
+      "css": ".ds-input { font: 400 15px/1.4 system-ui, -apple-system, Roboto; color: #e8e8e8; background: #1f1f25; border: 1px solid #2c2c35; border-radius: 18px; padding: 10px 14px; outline: none; transition: border-color 160ms; } .ds-input::placeholder { color: #8a8a96; } .ds-input:focus-visible { border-color: #9e4d54; }"
+    },
+    {
+      "name": "Assistant Bubble",
+      "kind": "card",
+      "refersTo": "bubble-assistant",
+      "description": "Left-aligned model reply; Slate Surface + hairline, markdown content.",
+      "html": "<div class=\"ds-bubble-ai\">Your messages run on your own hardware.</div>",
+      "css": ".ds-bubble-ai { max-width: 85%; font: 400 15px/1.5 system-ui, -apple-system, Roboto; color: #e8e8e8; background: #1f1f25; border: 1px solid #2c2c35; border-radius: 18px; border-bottom-left-radius: 8px; padding: 10px 14px; }"
+    },
+    {
+      "name": "User Bubble",
+      "kind": "card",
+      "refersTo": "bubble-user",
+      "description": "Right-aligned user message in warm Hearth Coals.",
+      "html": "<div class=\"ds-bubble-user\">summarize my unread email</div>",
+      "css": ".ds-bubble-user { max-width: 85%; margin-left: auto; font: 400 15px/1.5 system-ui, -apple-system, Roboto; color: #e8e8e8; background: #5a2f37; border-radius: 18px; border-bottom-right-radius: 8px; padding: 10px 14px; }"
+    },
+    {
+      "name": "Sidebar Nav Row (active)",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "A row in the slide-in sidebar; the active route gets an Ember Coral icon and Slate Raised row.",
+      "html": "<a class=\"ds-nav ds-nav--active\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#e06c75\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg><span>New Chat</span></a>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; color: #bdbdc7; font: 500 15px/1.2 system-ui, -apple-system, Roboto; text-decoration: none; cursor: pointer; transition: background 160ms; } .ds-nav:hover { background: #26262e; } .ds-nav--active { color: #e8e8e8; font-weight: 600; background: #26262e; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Desk",
+    "overview": "Odysseus Mobile is the phone you pick up in low light to talk to your own AI server. The room is cool and the lamp is warm: dark blue-graphite neutrals lit by a single warm coral accent, the one ember in the room. It marks the live action and nothing else, and the user's own messages glow in warm maroon coals so their words read as the lit thing on the desk. Depth comes from tonal layering and hairline borders, never drop shadows. Type is the OS system font, because the user's words and the model's words are the content.",
+    "keyCharacteristics": [
+      "Cool dark neutrals, one warm coral accent (never pure black or white).",
+      "One accent, used as an ember: rare, meaningful, never ambient.",
+      "Flat by default: tonal layers + 1px borders carry depth, not shadows.",
+      "System typography; the conversation is the type.",
+      "Built for the thumb: pill actions, generous targets, one-handed reach."
+    ],
+    "rules": [
+      { "name": "The One Ember Rule", "body": "Ember Coral (#e06c75) marks the single live or primary action in a region, plus the small brand mark. The send button must always be the brightest ember on the chat screen.", "section": "colors" },
+      { "name": "The Tinted Neutral Rule", "body": "Every neutral is tinted faintly toward cool blue. Pure #000 and #fff are forbidden; scrims tint toward #16161a.", "section": "colors" },
+      { "name": "The Two Reds Rule", "body": "Ember Coral (#e06c75, action) and Warm Alarm (#e0685e, danger) are close cousins. Keep them legible apart by role and placement, never hue alone. If they sit side by side as buttons, push Warm Alarm oranger.", "section": "colors" },
+      { "name": "The Flat Desk Rule", "body": "Surfaces are flat at rest and in motion. Use a tonal step and a hairline border instead of shadow, elevation, or blur. The only thing allowed to glow is the ember.", "section": "elevation" },
+      { "name": "The System Voice Rule", "body": "Type is the system font and nothing else. The content is the type.", "section": "typography" }
+    ],
+    "dos": [
+      "Do keep Ember Coral (#e06c75) to the live or primary action (plus the small brand mark) per region; the send button stays the brightest ember.",
+      "Do convey depth with tonal steps (#16161a to #1f1f25 to #26262e) and 1px #2c2c35 borders.",
+      "Do tint every neutral toward cool blue; keep text at #e8e8e8, not #fff, and scrims tinted toward #16161a, not #000.",
+      "Do keep the warm family (Ember Coral, Ember Dim, Hearth Coals) for the user's voice and live actions; cool neutrals for everything at rest.",
+      "Do disambiguate Ember Coral and Warm Alarm by role and position, not hue.",
+      "Do use the system font, pair every state signal with text or shape, and size touch targets at least 44pt."
+    ],
+    "donts": [
+      "Don't imitate big-tech AI apps (ChatGPT / Claude / Gemini): no assistant persona, no model marketing, no sign-in theatre.",
+      "Don't drift toward corporate SaaS: no gradient heroes, no cold enterprise polish, no upgrade prompts.",
+      "Don't build a generic dark dashboard: no neon-on-black, no glowing accent cards, no identical icon-plus-title grids.",
+      "Don't go childish or cartoonish: no mascots, no toy-like rounding, no emoji as iconography.",
+      "Don't use drop shadows, elevation as a visual effect, or glassmorphism to separate surfaces.",
+      "Don't use #000 or #fff anywhere.",
+      "Don't put a colored side-stripe border on rows, cards, or alerts."
+    ]
+  }
+}

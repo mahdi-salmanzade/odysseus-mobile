@@ -1,0 +1,86 @@
+{
+  "expo": {
+    "name": "Odysseus",
+    "slug": "odysseus-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "odysseusmobile",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/icon.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "tech.mindzone.odysseus",
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Odysseus connects to your self-hosted Odysseus server on your local network so you can chat with it.",
+        "NSCameraUsageDescription": "Odysseus uses the camera to scan the pairing QR code shown by your Odysseus server.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "tech.mindzone.odysseus",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "monochromeImage": "./assets/images/icon-tinted.png",
+        "backgroundColor": "#16161a"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Odysseus uses the camera to scan the pairing QR code shown by your Odysseus server.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#16161a"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "279b5893-2348-486a-b7d1-df419a5eb3d9"
+      }
+    },
+    "owner": "mahdibordo"
+  }
+}
