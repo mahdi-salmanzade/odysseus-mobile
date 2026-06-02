@@ -39,6 +39,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
         "android.permission.INTERNET"
       ]
     },
@@ -59,7 +61,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#16161a"
+          "backgroundColor": "#16161a",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 150
         }
       ],
       [
@@ -81,6 +85,9 @@
         "projectId": "279b5893-2348-486a-b7d1-df419a5eb3d9"
       }
     },
-    "owner": "mahdibordo"
+    "owner": "mahdibordo",
+    "updates": {
+      "url": "https://u.expo.dev/279b5893-2348-486a-b7d1-df419a5eb3d9"
+    }
   }
 }

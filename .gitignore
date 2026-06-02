@@ -38,3 +38,6 @@ eas.json
 
 # typescript
 *.tsbuildinfo
+
+# Local build artifacts
+build/
