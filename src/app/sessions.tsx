@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import { ApiError, deleteSession, listSessions, renameSession, type Session } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -198,19 +199,7 @@ export default function SessionsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable
-          hitSlop={12}
-          onPress={openSidebar}
-          style={styles.hamburger}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-        >
-          <Text style={styles.hamburgerText}>≡</Text>
-        </Pressable>
-        <Text style={styles.title}>Sessions</Text>
-        <View style={styles.hamburger} />
-      </View>
+      <ScreenHeader title="Sessions" onMenu={openSidebar} />
 
       {status.kind === 'loading' && (
         <View style={styles.center}>
@@ -280,18 +269,6 @@ const RenameInput = memo(function RenameInput({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-  },
-  hamburger: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  hamburgerText: { color: theme.color.textDim, fontSize: 26, lineHeight: 28 },
-  title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 10 },
   dim: { color: theme.color.textDim, textAlign: 'center', fontSize: theme.font.body, lineHeight: 21 },
   emptyTitle: { color: theme.color.text, fontSize: 18, fontWeight: '600' },

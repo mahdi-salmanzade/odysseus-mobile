@@ -16,6 +16,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import {
   addMemory,
@@ -149,29 +150,21 @@ export default function MemoryScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable
-          hitSlop={12}
-          onPress={openSidebar}
-          style={styles.hamburger}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-        >
-          <View style={styles.bar} />
-          <View style={styles.bar} />
-          <View style={styles.bar} />
-        </Pressable>
-        <Text style={styles.title}>Memory</Text>
-        <Pressable
-          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-          onPress={() => setComposing((v) => !v)}
-          style={styles.addBtn}
-          accessibilityRole="button"
-          accessibilityLabel={composing ? 'Close composer' : 'New memory'}
-        >
-          <Text style={styles.addBtnText}>{composing ? '×' : '+'}</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Memory"
+        onMenu={openSidebar}
+        right={
+          <Pressable
+            hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+            onPress={() => setComposing((v) => !v)}
+            style={styles.addBtn}
+            accessibilityRole="button"
+            accessibilityLabel={composing ? 'Close composer' : 'New memory'}
+          >
+            <Text style={styles.addBtnText}>{composing ? '×' : '+'}</Text>
+          </Pressable>
+        }
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -290,16 +283,6 @@ function MemoryCard({ memory, onDelete }: { memory: Memory; onDelete: () => void
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  hamburger: { width: 28, height: 22, justifyContent: 'center', gap: 5 },
-  bar: { height: 2, borderRadius: 2, backgroundColor: theme.color.textDim },
-  title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
   addBtn: { width: 28, height: 22, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: theme.color.accent, fontSize: 26, fontWeight: '300', lineHeight: 28 },
 

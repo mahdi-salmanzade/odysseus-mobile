@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import { ApiError, listTasks, type Task } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -56,21 +57,7 @@ export default function TasksScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable
-          hitSlop={12}
-          onPress={openSidebar}
-          style={styles.hamburger}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-        >
-          <View style={styles.bar} />
-          <View style={styles.bar} />
-          <View style={styles.bar} />
-        </Pressable>
-        <Text style={styles.title}>Tasks</Text>
-        <View style={styles.hamburger} />
-      </View>
+      <ScreenHeader title="Tasks" onMenu={openSidebar} />
 
       {loading ? (
         <View style={styles.center}>
@@ -148,16 +135,6 @@ function TaskRow({ task }: { task: Task }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  hamburger: { width: 24, gap: 5, justifyContent: 'center' },
-  bar: { height: 2, borderRadius: 2, backgroundColor: theme.color.textDim },
-  title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   list: { padding: 16, gap: 12 },
