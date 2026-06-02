@@ -27,6 +27,18 @@ export class ApiError extends Error {
   }
 }
 
+// Centralized 401 handling. The server returns 401 the moment its admin revokes
+// the paired token; without a global hook every screen would just show a
+// dead-end error whose Retry re-hits the same 401. The pairing provider
+// registers a callback here (which clears the stored pairing and lets the
+// router swap back to the pair screen), so a revoked token routes the user to
+// re-pair from anywhere. Fired once per detected 401, before the ApiError is
+// thrown / handed to onError.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
 export interface CompanionInfo {
   name: string;
   version: string;
@@ -53,6 +65,11 @@ export interface Session {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | string;
   content: string;
+  // Server-persisted per-message metadata. For assistant messages this carries
+  // the citation lists (web_sources / rag_sources / research_sources /
+  // memories_used) that arrived as SSE events while streaming — so a reloaded
+  // conversation can render the same Sources footer the live stream showed.
+  metadata?: Record<string, unknown>;
 }
 
 export interface ModelChoice {
@@ -111,6 +128,7 @@ async function request(
       signal: controller.signal,
     });
     if (res.status === 401) {
+      onUnauthorized?.();
       throw new ApiError('The pairing token was rejected. Re-pair from your server.', 'unauthorized', 401);
     }
     return res;
@@ -367,6 +385,24 @@ export interface ChatSources {
   memories?: MemoryUsed[];
 }
 
+/**
+ * Build the citation footer for a reloaded message from its persisted metadata.
+ * The live stream delivers these lists as `*_sources` / `memories_used` SSE
+ * events; on history reload the server returns the same lists under
+ * `message.metadata`, keyed slightly differently — map them to ChatSources so
+ * reopened conversations show the same Sources block as live ones. Returns
+ * undefined when there are no citations to show.
+ */
+export function sourcesFromMetadata(metadata: ChatMessage['metadata']): ChatSources | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const out: ChatSources = {};
+  if (Array.isArray(metadata.web_sources)) out.web = metadata.web_sources as WebSource[];
+  if (Array.isArray(metadata.rag_sources)) out.rag = metadata.rag_sources as RagSource[];
+  if (Array.isArray(metadata.research_sources)) out.research = metadata.research_sources as ResearchSource[];
+  if (Array.isArray(metadata.memories_used)) out.memories = metadata.memories_used as MemoryUsed[];
+  return out.web || out.rag || out.research || out.memories ? out : undefined;
+}
+
 export interface ChatStreamHandlers {
   onDelta: (text: string) => void;
   onDone?: () => void;
@@ -402,16 +438,24 @@ export function streamChat(
   const controller = new AbortController();
 
   // Bound only the CONNECT phase: if the host is offline/wrong the fetch can hang
-  // forever, stranding the composer. We abort after TIMEOUT_MS and clear the timer
-  // the moment response headers arrive, so an established stream is never cut off
-  // mid-generation (long replies are expected and must not be truncated).
+  // forever, stranding the composer. We abort after the connect deadline and clear
+  // the timer the moment response headers arrive, so an established stream is never
+  // cut off mid-generation (long replies are expected and must not be truncated).
+  //
+  // Web search, research, and agent runs do their work BEFORE the first byte —
+  // the server finishes context-building (live web search, RAG, etc.) and only
+  // then returns the stream — so the connect phase legitimately takes much longer
+  // than a plain chat. Give those a wider window so a slow search isn't mistaken
+  // for an unreachable server and falsely aborted.
+  const connectTimeoutMs =
+    args.useWeb || args.useResearch || args.mode === 'agent' ? 45000 : TIMEOUT_MS;
   let connected = false;
   let connectTimedOut = false;
   const connectTimer = setTimeout(() => {
     if (connected) return;
     connectTimedOut = true;
     controller.abort();
-  }, TIMEOUT_MS);
+  }, connectTimeoutMs);
 
   (async () => {
     let res: Response;
@@ -448,6 +492,7 @@ export function streamChat(
     clearTimeout(connectTimer);
 
     if (res.status === 401) {
+      onUnauthorized?.();
       handlers.onError?.(new ApiError('Token rejected. Re-pair from your server.', 'unauthorized', 401));
       return;
     }

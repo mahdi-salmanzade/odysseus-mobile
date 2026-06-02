@@ -5,6 +5,7 @@
  */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { setUnauthorizedHandler } from '@/lib/api';
 import { clearPairing, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
 
 interface PairingContextValue {
@@ -24,6 +25,17 @@ export function PairingProvider({ children }: { children: ReactNode }) {
     loadPairing()
       .then(setPairing)
       .finally(() => setReady(true));
+  }, []);
+
+  // When any API call sees a 401 (revoked/invalid token), clear the stored
+  // pairing. The router's Stack.Protected guard keys off `pairing`, so this
+  // alone routes the user back to the pair screen from wherever they are —
+  // no per-screen 401 handling needed.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearPairing().finally(() => setPairing(null));
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const value = useMemo<PairingContextValue>(

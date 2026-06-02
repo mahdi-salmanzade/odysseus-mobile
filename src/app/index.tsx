@@ -30,6 +30,7 @@ import {
   getHistory,
   listModels,
   listSessions,
+  sourcesFromMetadata,
   streamChat,
   type ChatMessage,
   type ChatSources,
@@ -241,7 +242,13 @@ export default function ChatScreen() {
         if (cancelled) return;
         const rows: ChatRow[] = history
           .filter((m) => m.role === 'user' || m.role === 'assistant')
-          .map((m) => ({ id: newRowId(), role: m.role, content: m.content }));
+          .map((m) => ({
+            id: newRowId(),
+            role: m.role,
+            content: m.content,
+            // Rehydrate the citation footer the server persisted with this reply.
+            sources: m.role === 'assistant' ? sourcesFromMetadata(m.metadata) : undefined,
+          }));
         const meta = list.find((s) => s.id === sessionParam) ?? null;
         setSession(
           meta ?? { id: sessionParam, name: 'Chat', model: '', rag: false, archived: false },
