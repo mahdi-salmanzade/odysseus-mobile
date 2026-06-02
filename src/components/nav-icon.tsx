@@ -9,7 +9,14 @@ import Svg, { Path } from 'react-native-svg';
 
 import { theme } from '@/constants/theme';
 
-export type NavIconName = 'chat' | 'sessions' | 'notes' | 'tasks' | 'memory' | 'settings';
+export type NavIconName =
+  | 'chat'
+  | 'sessions'
+  | 'notes'
+  | 'tasks'
+  | 'memory'
+  | 'research'
+  | 'settings';
 
 const PATHS: Record<NavIconName, string> = {
   chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
@@ -18,6 +25,7 @@ const PATHS: Record<NavIconName, string> = {
   tasks: 'M9 11l3 3 9-9M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   memory:
     'M5 5h14v14H5zM9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 14h3M2 9h3M2 14h3',
+  research: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
   settings: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
 };
 

@@ -580,3 +580,192 @@ export function streamChat(
     stopStream(p, args.session);
   };
 }
+
+// ---------------------------------------------------------------------------
+// Deep Research launcher (companion bridge /api/companion/research/*).
+//
+// A run is a server-side background task: you start it, watch its progress over
+// SSE, then read the finished report. Everything is scoped to the paired token's
+// owner by the bridge, so we only ever see/control our own runs.
+// ---------------------------------------------------------------------------
+
+/** A research run the server reports as currently running, for this owner. */
+export interface ResearchActiveRun {
+  session_id: string;
+  query: string;
+  status: string;
+  progress: Record<string, unknown>;
+  started_at: number;
+}
+
+/**
+ * One SSE frame from a run's progress stream. The server merges the run's
+ * progress dict with a `status`, and sends a final frame with `final: true`
+ * (and `error` on failure). Progress keys vary by server version, so this is
+ * intentionally open — the UI reads known fields defensively.
+ */
+export interface ResearchProgressEvent {
+  status: string;
+  final?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface ResearchResult {
+  result: string;
+  sources: ResearchSource[];
+  query: string;
+  status: string;
+}
+
+export interface StartResearchInput {
+  query: string;
+  /** Use a specific endpoint+model (from the chat picker); omit to let the server resolve. */
+  endpointId?: string;
+  model?: string;
+  /** 0 = Auto (server decides, capped at 20). */
+  maxRounds?: number;
+  maxTime?: number;
+  category?: string;
+}
+
+/** Launch a research run. Body is JSON (the server route takes a model, not a form). */
+export async function startResearch(
+  p: Pairing,
+  input: StartResearchInput,
+): Promise<{ session_id: string; status: string; query: string }> {
+  const body: Record<string, unknown> = { query: input.query };
+  if (input.endpointId) body.endpoint_id = input.endpointId;
+  if (input.model) body.model = input.model;
+  if (input.maxRounds != null) body.max_rounds = input.maxRounds;
+  if (input.maxTime != null) body.max_time = input.maxTime;
+  if (input.category) body.category = input.category;
+  const res = await request(p, '/api/companion/research/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return json(res);
+}
+
+/** The caller's own currently-running research runs (e.g. to resume watching one). */
+export async function listActiveResearch(p: Pairing): Promise<ResearchActiveRun[]> {
+  const res = await request(p, '/api/companion/research/active');
+  const data = await json<{ active: ResearchActiveRun[] }>(res);
+  return data.active ?? [];
+}
+
+/** Cancel a run. Best-effort: the stream will emit a final `cancelled` frame. */
+export async function cancelResearch(p: Pairing, sid: string): Promise<void> {
+  await request(p, `/api/companion/research/cancel/${encodeURIComponent(sid)}`, {
+    method: 'POST',
+  }).catch(() => {});
+}
+
+/** Read a run's report + sources (does not clear it server-side). */
+export async function getResearchResult(p: Pairing, sid: string): Promise<ResearchResult> {
+  const res = await request(p, `/api/companion/research/result/${encodeURIComponent(sid)}`, {
+    method: 'POST',
+  });
+  return json<ResearchResult>(res);
+}
+
+export interface ResearchStreamHandlers {
+  /** A progress frame while the run is still running. */
+  onProgress: (evt: ResearchProgressEvent) => void;
+  /** The run left `running` — status is `done`, `error`, `cancelled`, or `not_found`. */
+  onDone: (evt: ResearchProgressEvent) => void;
+  onError: (err: ApiError) => void;
+}
+
+/**
+ * Stream a run's progress over SSE (GET, unlike chat's POST stream). Returns an
+ * abort function. Mirrors the framing of {@link streamChat}: `data:` lines,
+ * blank-line-separated frames, connect-phase timeout that's cleared once the
+ * stream is established so a long run is never cut off.
+ */
+export function streamResearch(
+  p: Pairing,
+  sid: string,
+  handlers: ResearchStreamHandlers,
+): () => void {
+  const controller = new AbortController();
+  let connected = false;
+  let connectTimedOut = false;
+  const connectTimer = setTimeout(() => {
+    if (connected) return;
+    connectTimedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
+
+  (async () => {
+    let res: Response;
+    try {
+      res = await expoFetch(`${baseUrl(p)}/api/companion/research/stream/${encodeURIComponent(sid)}`, {
+        method: 'GET',
+        headers: { ...authHeaders(p), Accept: 'text/event-stream' },
+        signal: controller.signal,
+      });
+    } catch {
+      clearTimeout(connectTimer);
+      if (controller.signal.aborted && !connectTimedOut) return;
+      handlers.onError(
+        new ApiError(
+          connectTimedOut ? 'Odysseus didn’t respond in time.' : 'Lost connection to Odysseus.',
+          'network',
+        ),
+      );
+      return;
+    }
+    connected = true;
+    clearTimeout(connectTimer);
+
+    if (res.status === 401) {
+      handlers.onError(new ApiError('Token rejected. Re-pair from your server.', 'unauthorized', 401));
+      return;
+    }
+    if (!res.ok || !res.body) {
+      handlers.onError(new ApiError(`Server responded ${res.status}.`, 'server', res.status));
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buf.indexOf('\n\n')) !== -1) {
+          const frame = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          for (const line of frame.split('\n')) {
+            const t = line.trimStart();
+            if (t.startsWith(':') || !t.startsWith('data:')) continue;
+            const payload = t.slice(5).trim();
+            if (!payload) continue;
+            try {
+              const evt = JSON.parse(payload) as ResearchProgressEvent;
+              // The run is finished the moment it leaves `running` (or sends the
+              // final flag). Everything else is live progress.
+              if (evt.final || (evt.status && evt.status !== 'running')) handlers.onDone(evt);
+              else handlers.onProgress(evt);
+            } catch {
+              /* non-JSON data line — ignore */
+            }
+          }
+        }
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        handlers.onError(new ApiError('Research stream interrupted.', 'network'));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  })();
+
+  return () => controller.abort();
+}
