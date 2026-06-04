@@ -37,6 +37,7 @@ function RootNavigator() {
           <Stack.Screen name="index" />
           <Stack.Screen name="sessions" />
           <Stack.Screen name="notes" />
+          <Stack.Screen name="documents" />
           <Stack.Screen name="tasks" />
           <Stack.Screen name="memory" />
           <Stack.Screen name="research" />

@@ -101,6 +101,25 @@ export interface Memory {
   category?: string;
 }
 
+/** One entry in the RAG document library (list view — `snippet` is a preview). */
+export interface DocumentSummary {
+  id: string;
+  title: string;
+  language: string | null;
+  snippet: string;
+  updated_at: string | null;
+}
+
+/** A single document's full body (detail view). */
+export interface DocumentDetail {
+  id: string;
+  title: string;
+  language: string | null;
+  content: string;
+  archived: boolean;
+  updated_at: string | null;
+}
+
 export interface Preset {
   id: string;
   name: string;
@@ -305,6 +324,21 @@ export async function listTasks(p: Pairing): Promise<Task[]> {
 export async function listMemories(p: Pairing): Promise<Memory[]> {
   const res = await request(p, '/api/companion/memory');
   return listFrom<Memory>(res, 'memory');
+}
+
+/** List the owner's RAG documents (titles + previews; bodies via getDocument). */
+export async function listDocuments(p: Pairing): Promise<DocumentSummary[]> {
+  const res = await request(p, '/api/companion/documents');
+  const items = await listFrom<DocumentSummary>(res, 'documents');
+  // The server may send numeric ids; coerce to string so keys/route params match.
+  return items.map((d) => ({ ...d, id: String(d.id) }));
+}
+
+/** Fetch one document's full body. */
+export async function getDocument(p: Pairing, id: string): Promise<DocumentDetail> {
+  const res = await request(p, `/api/companion/documents/${encodeURIComponent(id)}`);
+  const d = await json<DocumentDetail>(res);
+  return { ...d, id: String(d.id) };
 }
 
 /**
