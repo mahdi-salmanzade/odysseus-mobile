@@ -6,6 +6,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { setUnauthorizedHandler } from '@/lib/api';
+import { discoverServerHost } from '@/lib/discover';
 import { clearPairing, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
 import { disablePushForPairing, enablePushForPairing } from '@/lib/push';
 
@@ -14,6 +15,12 @@ interface PairingContextValue {
   ready: boolean;
   pair: (p: Pairing) => Promise<void>;
   unpair: () => Promise<void>;
+  /**
+   * Re-find the paired server on the current network (its IP may have changed
+   * after a Wi-Fi switch) and update the stored host. Returns true if a server
+   * was located (host updated if it moved), false if none was found.
+   */
+  relocate: () => Promise<boolean>;
 }
 
 const PairingContext = createContext<PairingContextValue | null>(null);
@@ -56,6 +63,17 @@ export function PairingProvider({ children }: { children: ReactNode }) {
         if (pairing) await disablePushForPairing(pairing);
         await clearPairing();
         setPairing(null);
+      },
+      relocate: async () => {
+        if (!pairing) return false;
+        const host = await discoverServerHost(pairing);
+        if (!host) return false;
+        if (host !== pairing.host) {
+          const next = { ...pairing, host };
+          await savePairing(next);
+          setPairing(next); // host change re-runs screens' pairing-keyed effects → reconnect
+        }
+        return true;
       },
     }),
     [pairing, ready],

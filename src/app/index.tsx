@@ -85,12 +85,13 @@ function dedupeByUrl<T extends { url: string }>(items: T[]): T[] {
 
 type Status =
   | { kind: 'loading' }
+  | { kind: 'searching' } // scanning the LAN for the server after its IP moved
   | { kind: 'no_models' }
   | { kind: 'error'; message: string }
   | { kind: 'ready' };
 
 export default function ChatScreen() {
-  const { pairing } = usePairing();
+  const { pairing, relocate } = usePairing();
   const { openSidebar } = useSidebar();
   const dictation = useDictation();
   // Stable across dictation start/stop, so depending on it doesn't rebuild send().
@@ -131,6 +132,12 @@ export default function ChatScreen() {
   // read history mid-stream, we DON'T yank them back down on every token.
   const atBottomRef = useRef(true);
   const scrollPending = useRef(false);
+  // Bumped to force a reconnect attempt (after a manual or auto LAN rescan that
+  // found the server at the same IP — no pairing change to re-trigger on).
+  const [reloadTick, setReloadTick] = useState(0);
+  // We auto-rescan the LAN at most once per failed-connection episode; reset on
+  // a successful connect so a later network switch can auto-rescan again.
+  const triedRelocateRef = useRef(false);
 
   // Bootstrap: discover an available model. We do NOT create a session here —
   // that's deferred to the first send so we never persist empty conversations.
@@ -153,9 +160,28 @@ export default function ChatScreen() {
           ? list.find((c) => c.endpoint_id === pref.endpoint_id && c.model === pref.model)
           : undefined;
         setChoice(preferred ?? list[0]);
+        triedRelocateRef.current = false; // connected — re-arm auto-rescan for next time
         setStatus({ kind: 'ready' });
       } catch (e) {
         if (cancelled) return;
+        // Couldn't reach the host — likely a moved IP after a Wi-Fi switch. Scan
+        // the LAN once to relocate the server before surfacing a hard error.
+        const isNetwork = e instanceof ApiError && e.kind === 'network';
+        if (isNetwork && !triedRelocateRef.current) {
+          triedRelocateRef.current = true;
+          setStatus({ kind: 'searching' });
+          let found = false;
+          try {
+            found = await relocate();
+          } catch {
+            /* fall through to error */
+          }
+          if (cancelled) return; // a host change already re-ran this effect
+          if (found) {
+            setReloadTick((n) => n + 1); // server located at the same IP — retry
+            return;
+          }
+        }
         const message = e instanceof ApiError ? e.message : 'Something went wrong.';
         setStatus({ kind: 'error', message });
       }
@@ -164,7 +190,27 @@ export default function ChatScreen() {
       cancelled = true;
       abortRef.current?.();
     };
-  }, [pairing]);
+  }, [pairing, reloadTick, relocate]);
+
+  // Manual LAN rescan (from the "Couldn't connect" state). Finds the server on
+  // the current network and updates the stored IP, then forces a reconnect.
+  const searchNetwork = useCallback(async () => {
+    setStatus({ kind: 'searching' });
+    let found = false;
+    try {
+      found = await relocate();
+    } catch {
+      /* treated as not-found below */
+    }
+    if (found) {
+      setReloadTick((n) => n + 1); // host may be unchanged → re-run the bootstrap
+    } else {
+      setStatus({
+        kind: 'error',
+        message: 'No Odysseus found on this Wi-Fi. Check the server is running and on the same network.',
+      });
+    }
+  }, [relocate]);
 
   // Re-apply the saved model preference when this screen regains focus (e.g.
   // after changing it in Settings). Only affects the model used for the NEXT new
@@ -470,7 +516,7 @@ export default function ChatScreen() {
         <Pressable
           hitSlop={12}
           onPress={openSidebar}
-          style={styles.hamburger}
+          style={({ pressed }) => [styles.hamburger, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
           accessibilityLabel="Open menu"
         >
@@ -486,7 +532,12 @@ export default function ChatScreen() {
           </Text>
         </View>
         <Link href="/settings" asChild>
-          <Pressable hitSlop={12} accessibilityRole="button" accessibilityLabel="Open settings">
+          <Pressable
+            hitSlop={12}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+          >
             <SettingsIcon size={22} color={theme.color.textDim} />
           </Pressable>
         </Link>
@@ -508,10 +559,28 @@ export default function ChatScreen() {
         </View>
       )}
 
+      {status.kind === 'searching' && (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.color.accent} />
+          <Text style={styles.dim}>Looking for your Odysseus on this Wi-Fi…</Text>
+        </View>
+      )}
+
       {status.kind === 'error' && (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>Couldn’t connect</Text>
           <Text style={styles.dim}>{status.message}</Text>
+          <Text style={styles.dim}>
+            On a new Wi-Fi network the server’s IP may have changed. Search for it without re-pairing.
+          </Text>
+          <Pressable
+            style={styles.retry}
+            onPress={searchNetwork}
+            accessibilityRole="button"
+            accessibilityLabel="Search the network for the server"
+          >
+            <Text style={styles.retryText}>Search the network</Text>
+          </Pressable>
         </View>
       )}
 
@@ -532,6 +601,7 @@ export default function ChatScreen() {
                   setConvoError(null);
                   setConvoReload((n) => n + 1);
                 }}
+                style={({ pressed }) => pressed && { opacity: 0.6 }}
                 accessibilityRole="button"
               >
                 <Text style={styles.bannerRetry}>Retry</Text>
@@ -570,7 +640,7 @@ export default function ChatScreen() {
           </View>
 
           <View style={styles.composer}>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.input}
               value={input}
               onChangeText={setInput}
@@ -581,7 +651,11 @@ export default function ChatScreen() {
             />
             {dictation.available && !streaming && (
               <Pressable
-                style={[styles.micBtn, dictation.recognizing && styles.micBtnActive]}
+                style={({ pressed }) => [
+                  styles.micBtn,
+                  dictation.recognizing && styles.micBtnActive,
+                  pressed && { opacity: 0.6 },
+                ]}
                 onPress={toggleDictation}
                 accessibilityRole="button"
                 accessibilityLabel={dictation.recognizing ? 'Stop dictation' : 'Dictate message'}
@@ -594,12 +668,19 @@ export default function ChatScreen() {
               </Pressable>
             )}
             {streaming ? (
-              <Pressable style={[styles.sendBtn, styles.stopBtn]} onPress={stop}>
+              <Pressable
+                style={({ pressed }) => [styles.sendBtn, styles.stopBtn, pressed && { opacity: 0.85 }]}
+                onPress={stop}
+              >
                 <Text style={styles.stopText}>■</Text>
               </Pressable>
             ) : (
               <Pressable
-                style={[styles.sendBtn, !input.trim() && styles.sendDisabled]}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  !input.trim() && styles.sendDisabled,
+                  pressed && !!input.trim() && { opacity: 0.85 },
+                ]}
                 onPress={send}
                 disabled={!input.trim()}
               >
@@ -628,9 +709,17 @@ function Toggle({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      // The pill is short; extend the tap area vertically so it clears the 44pt
+      // touch-target floor without making the composer toolbar look chunky.
+      hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
       // Toggles only take effect at send time; mid-stream they'd silently do
       // nothing to the in-flight request, so dim + disable them while streaming.
-      style={[styles.toggle, active && styles.toggleActive, disabled && styles.toggleDisabled]}
+      style={({ pressed }) => [
+        styles.toggle,
+        active && styles.toggleActive,
+        disabled && styles.toggleDisabled,
+        pressed && !disabled && { opacity: 0.6 },
+      ]}
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled: !!disabled }}
     >
@@ -719,42 +808,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: theme.space(4.5),
+    paddingVertical: theme.space(3),
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
-    gap: 12,
+    gap: theme.space(3),
+    // Match the shared ScreenHeader's gap so the chat hero breathes below the
+    // nav exactly like every other screen.
+    marginBottom: theme.space(4),
   },
   // Thin transparent capture zone pinned to the left edge for the open-drawer
   // swipe. Sits above content but only ~22px wide; non-pan taps fall through.
-  edgeSwipe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 22, zIndex: 20 },
-  hamburger: { paddingRight: 2 },
+  edgeSwipe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: theme.space(5.5), zIndex: 20 },
+  hamburger: { paddingRight: theme.space(0.5) },
   headerCenter: { flex: 1 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },
   brand: { color: theme.color.accent, fontSize: theme.font.title, fontWeight: '700' },
   model: { color: theme.color.textFaint, fontSize: theme.font.small },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 10 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.space(8), gap: theme.space(2.5) },
   dim: { color: theme.color.textDim, textAlign: 'center', fontSize: theme.font.body, lineHeight: 21 },
   emptyTitle: { color: theme.color.text, fontSize: 18, fontWeight: '600' },
+  retry: {
+    marginTop: theme.space(1),
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  retryText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
   // Empty state: the mark sits inline to the left of the gradient wordmark,
   // mirroring the desktop hero (its eye glyph beside a gradient name).
-  emptyBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  emptyBrandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2), marginBottom: theme.space(1) },
   emptyTagline: {
     color: theme.color.textDim,
     fontSize: theme.font.body,
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   },
-  listContent: { padding: 14, flexGrow: 1 },
+  // Header owns the top gap (its marginBottom); list keeps only side + bottom.
+  listContent: { paddingHorizontal: theme.space(3.5), paddingBottom: theme.space(3.5), flexGrow: 1 },
 
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    marginHorizontal: 12,
-    marginTop: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: theme.space(3),
+    marginHorizontal: theme.space(3),
+    marginTop: theme.space(2),
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.md,
     backgroundColor: theme.color.dangerSurface,
     borderWidth: 1,
@@ -764,10 +867,10 @@ const styles = StyleSheet.create({
   bannerRetry: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '700' },
 
   // Message bubbles (inline, so assistant content can host the markdown view).
-  row: { width: '100%', marginVertical: 4, flexDirection: 'row' },
+  row: { width: '100%', marginVertical: theme.space(1), flexDirection: 'row' },
   rowUser: { justifyContent: 'flex-end' },
   rowAssistant: { justifyContent: 'flex-start' },
-  bubble: { maxWidth: '85%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: theme.radius.lg },
+  bubble: { maxWidth: '85%', paddingHorizontal: theme.space(3.5), paddingVertical: theme.space(2.5), borderRadius: theme.radius.lg },
   userBubble: { backgroundColor: theme.color.userBubble, borderBottomRightRadius: theme.radius.sm },
   assistantBubble: {
     backgroundColor: theme.color.assistantBubble,
@@ -779,11 +882,11 @@ const styles = StyleSheet.create({
 
   // Citation block under an assistant bubble.
   sources: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: theme.space(2.5),
+    paddingTop: theme.space(2.5),
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
-    gap: 4,
+    gap: theme.space(1),
   },
   sourcesLabel: {
     color: theme.color.textFaint,
@@ -791,21 +894,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 2,
+    marginTop: theme.space(0.5),
   },
   sourceLink: { color: theme.color.accent, fontSize: theme.font.small, lineHeight: 19 },
   sourceDoc: { color: theme.color.textDim, fontSize: theme.font.small, lineHeight: 19 },
-  sourceMeta: { color: theme.color.textFaint, fontSize: theme.font.small, marginTop: 2 },
+  sourceMeta: { color: theme.color.textFaint, fontSize: theme.font.small, marginTop: theme.space(0.5) },
 
   toolbar: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    gap: theme.space(2),
+    paddingHorizontal: theme.space(3),
+    paddingTop: theme.space(2),
   },
   toggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(1.5),
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     borderColor: theme.color.border,
@@ -819,9 +922,9 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: theme.space(2.5),
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(2.5),
     borderTopWidth: 0,
   },
   input: {
@@ -831,9 +934,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.lg,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingHorizontal: theme.space(3.5),
+    paddingTop: theme.space(2.5),
+    paddingBottom: theme.space(2.5),
     color: theme.color.text,
     fontSize: theme.font.body,
   },
