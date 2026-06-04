@@ -973,3 +973,60 @@ export function streamResearch(
 
   return () => controller.abort();
 }
+
+// ---------------------------------------------------------------------------
+// Model Compare (companion bridge /api/companion/compare/*).
+//
+// The phone runs the two streams itself (two streamChat calls against two
+// sessions) — the server never orchestrates the run. These endpoints only
+// persist the OUTCOME: a recorded comparison + its winner vote, scoped to the
+// paired token's owner, so past comparisons survive across app launches.
+// ---------------------------------------------------------------------------
+
+/** One persisted comparison: the prompt, the two models pitted, and the vote. */
+export interface CompareRecord {
+  id: string;
+  prompt: string;
+  model_a: string;
+  model_b: string;
+  winner: 'a' | 'b' | 'tie' | null;
+  is_blind: boolean;
+  voted_at: string | null;
+  created_at: string | null;
+}
+
+/** List the owner's past comparisons (newest-first per the server). */
+export async function listCompareHistory(p: Pairing): Promise<CompareRecord[]> {
+  const res = await request(p, '/api/companion/compare/history');
+  const items = await listFrom<CompareRecord>(res, 'items');
+  // Coerce ids to string so list keys / route params match regardless of the
+  // server sending numeric ids.
+  return items.map((c) => ({ ...c, id: String(c.id) }));
+}
+
+/** Record a finished comparison + its winner vote. Returns the new entry's id. */
+export async function recordComparison(
+  p: Pairing,
+  input: { prompt: string; modelA: string; modelB: string; winner: 'a' | 'b' | 'tie'; isBlind: boolean },
+): Promise<{ id: string }> {
+  const res = await request(p, '/api/companion/compare/record', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form({
+      prompt: input.prompt,
+      model_a: input.modelA,
+      model_b: input.modelB,
+      winner: input.winner,
+      is_blind: input.isBlind ? 'true' : 'false',
+    }),
+  });
+  const data = await json<{ id: string | number; status: string }>(res);
+  return { id: String(data.id) };
+}
+
+export async function deleteComparison(p: Pairing, id: string): Promise<void> {
+  const res = await request(p, `/api/companion/compare/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
+}
