@@ -1030,3 +1030,94 @@ export async function deleteComparison(p: Pairing, id: string): Promise<void> {
   });
   if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
 }
+
+// ---------------------------------------------------------------------------
+// Calendar (companion bridge /api/companion/calendars + /events).
+//
+// An agenda view over the owner's calendars: list calendars (for the picker +
+// color dots), list events in a time window, create an event, delete one. All
+// scoped to the paired token's owner by the bridge.
+// ---------------------------------------------------------------------------
+
+/** One calendar the owner can file events under (the create picker lists these). */
+export interface CalendarCal {
+  id: string;
+  name: string;
+  color: string;
+  source: string;
+}
+
+/** A single event. `dtstart`/`dtend` are ISO strings (null when absent). */
+export interface CalendarEvent {
+  uid: string;
+  calendar_id: string;
+  summary: string;
+  description: string;
+  location: string;
+  dtstart: string | null;
+  dtend: string | null;
+  all_day: boolean;
+  rrule: string;
+  status: string;
+  importance: string;
+  event_type: string | null;
+  color: string | null;
+}
+
+/** The owner's calendars (for the create picker + per-event color dots). */
+export async function listCalendars(p: Pairing): Promise<CalendarCal[]> {
+  const res = await request(p, '/api/companion/calendars');
+  return listFrom<CalendarCal>(res, 'calendars');
+}
+
+/** Events in an optional [start, end] window (omit either to widen the range). */
+export async function listEvents(
+  p: Pairing,
+  range: { start?: string; end?: string },
+): Promise<CalendarEvent[]> {
+  // Build the query string only for params the caller actually provided.
+  const qs = form(
+    Object.fromEntries(
+      Object.entries({ start: range.start, end: range.end }).filter(([, v]) => v != null),
+    ) as Record<string, string>,
+  );
+  const res = await request(p, `/api/companion/events${qs ? `?${qs}` : ''}`);
+  return listFrom<CalendarEvent>(res, 'events');
+}
+
+/** Create an event under a calendar. Returns its uid + status. */
+export async function createEvent(
+  p: Pairing,
+  input: {
+    calendarId: string;
+    summary: string;
+    dtstart: string;
+    dtend: string;
+    description?: string;
+    location?: string;
+    allDay?: boolean;
+  },
+): Promise<{ uid: string; status: string }> {
+  const fields: Record<string, string> = {
+    calendar_id: input.calendarId,
+    summary: input.summary,
+    dtstart: input.dtstart,
+    dtend: input.dtend,
+    all_day: input.allDay ? 'true' : 'false',
+  };
+  if (input.description != null) fields.description = input.description;
+  if (input.location != null) fields.location = input.location;
+  const res = await request(p, '/api/companion/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form(fields),
+  });
+  return json<{ uid: string; status: string }>(res);
+}
+
+export async function deleteEvent(p: Pairing, uid: string): Promise<void> {
+  const res = await request(p, `/api/companion/events/${encodeURIComponent(uid)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
+}
