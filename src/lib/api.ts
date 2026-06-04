@@ -398,6 +398,55 @@ export interface RagSource {
   similarity: number;
 }
 
+// ---------------------------------------------------------------------------
+// Web search (stock /api/search endpoints).
+//
+// A one-shot lookup: POST a query, get back a `context` blob (the synthesized
+// summary the LLM would otherwise consume) plus the `sources` it drew from.
+// Reuses WebSource for sources since the shape matches ({url, title}).
+// ---------------------------------------------------------------------------
+
+export interface SearchProvider {
+  id: string;
+  label: string;
+  available: boolean;
+}
+
+export interface SearchResult {
+  context: string;
+  sources: WebSource[];
+  error?: string;
+}
+
+/** The web-search backends the server has configured (some may be unavailable). */
+export async function listSearchProviders(p: Pairing): Promise<SearchProvider[]> {
+  const res = await request(p, '/api/search/providers');
+  const data = await json<SearchProvider[] | { providers: SearchProvider[] }>(res);
+  return Array.isArray(data) ? data : (data.providers ?? []);
+}
+
+/**
+ * Run a one-shot web search. The route accepts a form body; `time_filter` is
+ * optional (e.g. 'day'/'week'/'month'/'year' — omit to let the server decide).
+ * The server may return a 200 with an `error` field set rather than a non-2xx,
+ * so the caller should surface `error` even on success.
+ */
+export async function webSearch(
+  p: Pairing,
+  query: string,
+  timeFilter?: string,
+): Promise<SearchResult> {
+  const fields: Record<string, string> = { query };
+  if (timeFilter) fields.time_filter = timeFilter;
+  const res = await request(p, '/api/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form(fields),
+  });
+  const data = await json<Partial<SearchResult>>(res);
+  return { context: data.context ?? '', sources: data.sources ?? [], error: data.error };
+}
+
 export interface ResearchSource {
   url: string;
   title: string;

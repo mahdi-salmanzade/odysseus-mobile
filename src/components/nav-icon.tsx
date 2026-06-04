@@ -16,6 +16,7 @@ export type NavIconName =
   | 'tasks'
   | 'memory'
   | 'research'
+  | 'search'
   | 'settings';
 
 const PATHS: Record<NavIconName, string> = {
@@ -26,6 +27,7 @@ const PATHS: Record<NavIconName, string> = {
   memory:
     'M5 5h14v14H5zM9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 14h3M2 9h3M2 14h3',
   research: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
+  search: 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6',
   settings: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
 };
 

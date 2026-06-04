@@ -40,6 +40,7 @@ function RootNavigator() {
           <Stack.Screen name="tasks" />
           <Stack.Screen name="memory" />
           <Stack.Screen name="research" />
+          <Stack.Screen name="search" />
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
         </Stack.Protected>
 
