@@ -101,6 +101,15 @@ export interface Memory {
   category?: string;
 }
 
+export interface Preset {
+  id: string;
+  name: string;
+  temperature?: number;
+  max_tokens?: number;
+  system_prompt?: string;
+  enabled?: boolean;
+}
+
 function baseUrl(p: Pairing): string {
   return `http://${p.host}:${p.port}`;
 }
@@ -296,6 +305,36 @@ export async function listTasks(p: Pairing): Promise<Task[]> {
 export async function listMemories(p: Pairing): Promise<Memory[]> {
   const res = await request(p, '/api/companion/memory');
   return listFrom<Memory>(res, 'memory');
+}
+
+/**
+ * List the chat presets configured on the server (read-only — creating/editing
+ * presets is admin-only server-side). Unlike the other list endpoints this one
+ * returns a JSON OBJECT keyed by preset id, and that object is shared with
+ * non-preset config: it also carries `user_templates` (an array) and possibly
+ * other arrays/strings. So we keep only plain-object values that look like a
+ * preset (a string `name` and/or `system_prompt`) and key each by its id.
+ */
+export async function listPresets(p: Pairing): Promise<Preset[]> {
+  const res = await request(p, '/api/presets');
+  const data = await json<Record<string, unknown>>(res);
+  const out: Preset[] = [];
+  for (const [id, value] of Object.entries(data)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const v = value as Record<string, unknown>;
+    const name = typeof v.name === 'string' ? v.name : undefined;
+    const systemPrompt = typeof v.system_prompt === 'string' ? v.system_prompt : undefined;
+    if (name === undefined && systemPrompt === undefined) continue;
+    out.push({
+      id,
+      name: name ?? id,
+      temperature: typeof v.temperature === 'number' ? v.temperature : undefined,
+      max_tokens: typeof v.max_tokens === 'number' ? v.max_tokens : undefined,
+      system_prompt: systemPrompt,
+      enabled: typeof v.enabled === 'boolean' ? v.enabled : undefined,
+    });
+  }
+  return out;
 }
 
 /** Categories the memory composer offers. Matches the server's allowed set. */
