@@ -120,6 +120,20 @@ export interface DocumentDetail {
   updated_at: string | null;
 }
 
+/** One image in the owner's gallery. `image_url` is a server-relative path
+ *  (e.g. `/api/companion/gallery/image/<id>`) — build an authenticated source
+ *  for it with {@link imageSource}. */
+export interface GalleryImageItem {
+  id: string;
+  prompt: string;
+  model: string | null;
+  favorite: boolean;
+  width: number | null;
+  height: number | null;
+  created_at: string | null;
+  image_url: string;
+}
+
 export interface Preset {
   id: string;
   name: string;
@@ -135,6 +149,19 @@ function baseUrl(p: Pairing): string {
 
 function authHeaders(p: Pairing): Record<string, string> {
   return { Authorization: `Bearer ${p.token}` };
+}
+
+/**
+ * Build an authenticated <Image> source for a server-relative image URL (e.g.
+ * a gallery image's `image_url`). The image endpoints require the Bearer token
+ * like every other route, so a plain `{ uri }` would 401; React Native's Image
+ * accepts per-request headers, so we pass the absolute URL plus the auth header.
+ */
+export function imageSource(
+  p: Pairing,
+  imageUrl: string,
+): { uri: string; headers: Record<string, string> } {
+  return { uri: `${baseUrl(p)}${imageUrl}`, headers: authHeaders(p) };
 }
 
 async function request(
@@ -339,6 +366,16 @@ export async function getDocument(p: Pairing, id: string): Promise<DocumentDetai
   const res = await request(p, `/api/companion/documents/${encodeURIComponent(id)}`);
   const d = await json<DocumentDetail>(res);
   return { ...d, id: String(d.id) };
+}
+
+/** List the owner's generated/uploaded gallery images (newest-first per the
+ *  server). Fetch each image's bytes with an authenticated source built from
+ *  its `image_url` via {@link imageSource}. */
+export async function listGalleryImages(p: Pairing): Promise<GalleryImageItem[]> {
+  const res = await request(p, '/api/companion/gallery');
+  const items = await listFrom<GalleryImageItem>(res, 'items');
+  // The server may send numeric ids; coerce to string so keys/route params match.
+  return items.map((i) => ({ ...i, id: String(i.id) }));
 }
 
 /**

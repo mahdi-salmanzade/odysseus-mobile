@@ -36,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'sessions', label: 'Sessions', href: '/sessions' },
   { icon: 'notes', label: 'Notes', href: '/notes' },
   { icon: 'documents', label: 'Documents', href: '/documents' },
+  { icon: 'gallery', label: 'Gallery', href: '/gallery' },
   { icon: 'tasks', label: 'Tasks', href: '/tasks' },
   { icon: 'calendar', label: 'Calendar', href: '/calendar' },
   { icon: 'email', label: 'Email', href: '/email' },
