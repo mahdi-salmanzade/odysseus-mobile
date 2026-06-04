@@ -28,6 +28,20 @@ export function MenuIcon({ size = 20, color = theme.color.textDim }: { size?: nu
   );
 }
 
+/** Microphone — toggles voice dictation in the composer. */
+export function MicIcon({ size = 22, color = theme.color.textDim }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Mic capsule */}
+      <Path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" fill={color} />
+      {/* Holder arc + stand */}
+      <Path d="M5 11a7 7 0 0 0 14 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path d="M12 18v3" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path d="M9 21h6" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 /** Gear / cog — opens Settings. */
 export function SettingsIcon({ size = 22, color = theme.color.textDim }: { size?: number; color?: string }) {
   return (

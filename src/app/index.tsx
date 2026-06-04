@@ -18,7 +18,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MenuIcon, SettingsIcon } from '@/components/header-icons';
+import { MenuIcon, MicIcon, SettingsIcon } from '@/components/header-icons';
 import Markdown from '@/components/markdown';
 import { OdysseusLogo } from '@/components/odysseus-logo';
 import { OdysseusWordmark } from '@/components/odysseus-wordmark';
@@ -37,6 +37,7 @@ import {
   type ModelChoice,
   type Session,
 } from '@/lib/api';
+import { useDictation } from '@/lib/dictation';
 import { usePairing } from '@/lib/pairing-context';
 import { loadModelPref } from '@/lib/prefs';
 import { useSidebar } from '@/lib/sidebar-context';
@@ -91,6 +92,9 @@ type Status =
 export default function ChatScreen() {
   const { pairing } = usePairing();
   const { openSidebar } = useSidebar();
+  const dictation = useDictation();
+  // Stable across dictation start/stop, so depending on it doesn't rebuild send().
+  const cancelDictation = dictation.cancel;
   // `?session=<id>` (from the Sessions screen) opens an existing conversation;
   // absent (New Chat) starts a fresh one with no server-side session yet.
   const params = useLocalSearchParams<{ session?: string }>();
@@ -272,6 +276,9 @@ export default function ChatScreen() {
   const send = useCallback(() => {
     const text = input.trim();
     if (!text || !pairing || !choice || streaming) return;
+    // End any live dictation first so a late transcript can't repopulate the
+    // input we're about to clear (cancel mutes the sink, unlike stop).
+    cancelDictation();
     setInput('');
     setStreaming(true);
 
@@ -418,7 +425,7 @@ export default function ChatScreen() {
         },
       );
     })();
-  }, [input, pairing, choice, session, streaming, scrollToEnd, agentMode, useWeb, useResearch]);
+  }, [input, pairing, choice, session, streaming, scrollToEnd, agentMode, useWeb, useResearch, cancelDictation]);
 
   const stop = useCallback(() => {
     // Cancel a send that's still awaiting createSession, then abort the stream.
@@ -428,6 +435,12 @@ export default function ChatScreen() {
     abortRef.current = null;
     setStreaming(false);
   }, []);
+
+  // Start/stop voice dictation, streaming the transcript into the composer.
+  const toggleDictation = useCallback(() => {
+    Haptics.selectionAsync();
+    dictation.toggle(input, setInput);
+  }, [dictation, input]);
 
   const copyMessage = useCallback(async (content: string) => {
     if (!content) return;
@@ -561,11 +574,25 @@ export default function ChatScreen() {
               style={styles.input}
               value={input}
               onChangeText={setInput}
-              placeholder="Message Odysseus…"
+              placeholder={dictation.recognizing ? 'Listening…' : 'Message Odysseus…'}
               placeholderTextColor={theme.color.textFaint}
               multiline
               editable={!streaming}
             />
+            {dictation.available && !streaming && (
+              <Pressable
+                style={[styles.micBtn, dictation.recognizing && styles.micBtnActive]}
+                onPress={toggleDictation}
+                accessibilityRole="button"
+                accessibilityLabel={dictation.recognizing ? 'Stop dictation' : 'Dictate message'}
+                accessibilityState={{ selected: dictation.recognizing }}
+              >
+                <MicIcon
+                  size={20}
+                  color={dictation.recognizing ? theme.color.onAccent : theme.color.textDim}
+                />
+              </Pressable>
+            )}
             {streaming ? (
               <Pressable style={[styles.sendBtn, styles.stopBtn]} onPress={stop}>
                 <Text style={styles.stopText}>■</Text>
@@ -818,6 +845,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  micBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Listening: light the mic like the send "lamp" so it's clearly recording.
+  micBtnActive: { backgroundColor: theme.color.accent, borderColor: theme.color.accent },
   sendDisabled: { opacity: 0.4 },
   sendText: { color: theme.color.onAccent, fontSize: 20, fontWeight: '800' },
   stopBtn: { backgroundColor: theme.color.danger },

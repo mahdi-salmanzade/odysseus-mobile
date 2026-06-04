@@ -1,5 +1,4 @@
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
@@ -12,24 +11,15 @@ import { PairingProvider, usePairing } from '@/lib/pairing-context';
 import { setupNotificationTapHandler } from '@/lib/push';
 import { SidebarProvider } from '@/lib/sidebar-context';
 
-// Keep the native splash up until we've read the keychain, so an already-paired
-// user never flashes the pairing screen (or a blank frame) on cold start.
-SplashScreen.preventAutoHideAsync().catch(() => {});
-
 function RootNavigator() {
   const { pairing, ready } = usePairing();
-
-  // Hide the splash only once the keychain read resolves.
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
 
   // Route notification taps to the relevant screen, app-wide.
   useEffect(() => setupNotificationTapHandler(), []);
 
-  // Until then, paint the splash-colored background ourselves rather than
-  // returning null — returning null would rely on the native splash still
-  // covering the screen, which isn't guaranteed once the JS layout has mounted.
+  // While the keychain read is in flight, paint our own background instead of
+  // the pairing screen — so an already-paired user never flashes the pairing
+  // UI on cold start. (There's no native splash to fall back on anymore.)
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.color.bg }} />;
 
   const paired = !!pairing;
