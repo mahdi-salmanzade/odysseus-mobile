@@ -16,6 +16,7 @@ export type NavIconName =
   | 'documents'
   | 'tasks'
   | 'calendar'
+  | 'email'
   | 'memory'
   | 'research'
   | 'search'
@@ -32,6 +33,8 @@ const PATHS: Record<NavIconName, string> = {
   // A month grid: rounded frame, top binding posts, header rule, and day dots.
   calendar:
     'M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 2v4M16 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01',
+  // An envelope: rounded rect body + the two diagonal flap lines meeting at center.
+  email: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 7l9 6 9-6',
   memory:
     'M5 5h14v14H5zM9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 14h3M2 9h3M2 14h3',
   research: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',

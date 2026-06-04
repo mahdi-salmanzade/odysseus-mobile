@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'documents', label: 'Documents', href: '/documents' },
   { icon: 'tasks', label: 'Tasks', href: '/tasks' },
   { icon: 'calendar', label: 'Calendar', href: '/calendar' },
+  { icon: 'email', label: 'Email', href: '/email' },
   { icon: 'presets', label: 'Presets', href: '/presets' },
   { icon: 'memory', label: 'Memory', href: '/memory' },
   { icon: 'research', label: 'Research', href: '/research' },

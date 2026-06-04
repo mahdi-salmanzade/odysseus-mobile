@@ -1121,3 +1121,79 @@ export async function deleteEvent(p: Pairing, uid: string): Promise<void> {
   });
   if (!res.ok) throw new ApiError(`Server responded ${res.status}.`, 'server', res.status);
 }
+
+// ---------------------------------------------------------------------------
+// Email (companion bridge /api/companion/email/*).
+//
+// Browse one of the owner's configured mail accounts: list accounts, list a
+// folder's headers, read a single message's body, send a new message. All
+// scoped to the paired token's owner by the bridge. The mailbox itself lives
+// behind IMAP/SMTP, so messages/message can return a 502 when it's unreachable
+// — the UI surfaces that as a friendly "try again" rather than a crash.
+// ---------------------------------------------------------------------------
+
+/** One configured mail account (the account switcher lists these). */
+export interface EmailAccount {
+  id: string;
+  name: string;
+  from_address: string;
+  enabled: boolean;
+  is_default: boolean;
+}
+
+/** A message header in a folder listing (body fetched separately). */
+export interface EmailHeader {
+  uid: string;
+  subject: string;
+  from: string;
+  date: string | null;
+}
+
+/** A single message's full detail (the reader view). */
+export interface EmailMessage {
+  uid: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string | null;
+  body: string;
+}
+
+/** The owner's configured mail accounts (for the account switcher). */
+export async function listEmailAccounts(p: Pairing): Promise<EmailAccount[]> {
+  const res = await request(p, '/api/companion/email/accounts');
+  return listFrom<EmailAccount>(res, 'accounts');
+}
+
+/** Headers in a folder (defaults: INBOX, newest 30) for one account. */
+export async function listEmailMessages(
+  p: Pairing,
+  { accountId, folder = 'INBOX', limit = 30 }: { accountId: string; folder?: string; limit?: number },
+): Promise<EmailHeader[]> {
+  const qs = form({ account_id: accountId, folder, limit: String(limit) });
+  const res = await request(p, `/api/companion/email/messages?${qs}`);
+  return listFrom<EmailHeader>(res, 'messages');
+}
+
+/** Fetch one message's full body + headers. */
+export async function readEmailMessage(
+  p: Pairing,
+  { accountId, uid, folder = 'INBOX' }: { accountId: string; uid: string; folder?: string },
+): Promise<EmailMessage> {
+  const qs = form({ account_id: accountId, folder });
+  const res = await request(p, `/api/companion/email/message/${encodeURIComponent(uid)}?${qs}`);
+  return json<EmailMessage>(res);
+}
+
+/** Send a message from an account. `to` is comma-separated. Returns the recipients. */
+export async function sendEmail(
+  p: Pairing,
+  { accountId, to, subject, body }: { accountId: string; to: string; subject: string; body: string },
+): Promise<{ status: string; to: string[] }> {
+  const res = await request(p, '/api/companion/email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form({ account_id: accountId, to, subject, body }),
+  });
+  return json<{ status: string; to: string[] }>(res);
+}
