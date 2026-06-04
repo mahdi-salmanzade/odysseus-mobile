@@ -47,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'research', label: 'Research', href: '/research' },
   { icon: 'search', label: 'Search', href: '/search' },
   { icon: 'compare', label: 'Compare', href: '/compare' },
+  { icon: 'admin', label: 'Admin', href: '/admin' },
   { icon: 'settings', label: 'Settings', href: '/settings' },
 ];
 

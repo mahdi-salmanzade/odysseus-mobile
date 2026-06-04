@@ -1315,3 +1315,118 @@ export async function sendEmail(
   });
   return json<{ status: string; to: string[] }>(res);
 }
+
+// ---------------------------------------------------------------------------
+// Admin tools (companion bridge /api/companion/admin + the admin-gated routes).
+//
+// These power the in-app Admin hub: a server-side terminal, the owner's
+// contacts, the secrets vault, the MCP server list, and the cookbook state.
+// They're admin-only AND opt-in: every route is gated server-side behind a
+// feature toggle + an owner-is-admin check + the companion scope. The phone
+// asks /admin/status first and only renders the tools when the gate would let
+// this caller through (`available`). All scoped to the paired token's owner.
+// ---------------------------------------------------------------------------
+
+/** Whether the admin tools are reachable for this caller, and why not if not. */
+export interface AdminStatus {
+  enabled: boolean;
+  is_admin: boolean;
+  available: boolean;
+}
+
+/** Probe the admin gate. `available` = the gate would let this caller through. */
+export async function getAdminStatus(p: Pairing): Promise<AdminStatus> {
+  const res = await request(p, '/api/companion/admin/status');
+  return json<AdminStatus>(res);
+}
+
+/** One contact: a display name and zero or more email addresses. */
+export interface Contact {
+  name: string;
+  emails: string[];
+}
+
+/** Search the owner's contacts (omit `q` for the full list). */
+export async function listContacts(p: Pairing, q?: string): Promise<Contact[]> {
+  const qs = q && q.trim() ? `?${form({ q: q.trim() })}` : '';
+  const res = await request(p, `/api/companion/contacts${qs}`);
+  return listFrom<Contact>(res, 'items');
+}
+
+/** The result of a server-side command run: streams captured, plus exit code. */
+export interface TerminalResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+}
+
+/** Run a command on the server. Form fields `command` + optional `timeout`. */
+export async function runCommand(
+  p: Pairing,
+  command: string,
+  timeout?: number,
+): Promise<TerminalResult> {
+  const fields: Record<string, string> = { command };
+  if (timeout != null) fields.timeout = String(timeout);
+  const res = await request(p, '/api/companion/terminal/exec', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form(fields),
+  });
+  return json<TerminalResult>(res);
+}
+
+/** The secrets vault's lock state. `unlocked_at` is empty until it's unlocked. */
+export interface VaultStatus {
+  unlocked: boolean;
+  unlocked_at: string;
+  configured: boolean;
+}
+
+/** Fetch the vault's current lock state. */
+export async function getVaultStatus(p: Pairing): Promise<VaultStatus> {
+  const res = await request(p, '/api/companion/vault/status');
+  return json<VaultStatus>(res);
+}
+
+/**
+ * Unlock the vault with the master password. Form field `master_password`. The
+ * server returns 200 with `ok:false` + an `error` on a bad password rather than
+ * a non-2xx, so the caller surfaces `error` even on success. Never store the
+ * password.
+ */
+export async function unlockVault(
+  p: Pairing,
+  masterPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await request(p, '/api/companion/vault/unlock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form({ master_password: masterPassword }),
+  });
+  const data = await json<{ ok: boolean; unlocked?: boolean; error?: string }>(res);
+  return { ok: !!data.ok, error: data.error };
+}
+
+/** One configured MCP (Model Context Protocol) server. */
+export interface McpServer {
+  id: string;
+  name: string;
+  transport: string;
+  command: string | null;
+  url: string | null;
+  enabled: boolean;
+}
+
+/** List the owner's configured MCP servers (read-only). */
+export async function listMcpServers(p: Pairing): Promise<McpServer[]> {
+  const res = await request(p, '/api/companion/mcp/servers');
+  return listFrom<McpServer>(res, 'items');
+}
+
+/** Fetch the cookbook state (arbitrary nested JSON, secrets stripped server-side). */
+export async function getCookbookState(p: Pairing): Promise<Record<string, unknown>> {
+  const res = await request(p, '/api/companion/cookbook/state');
+  const data = await json<{ state: Record<string, unknown> }>(res);
+  return data.state ?? {};
+}

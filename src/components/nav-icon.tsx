@@ -25,6 +25,7 @@ export type NavIconName =
   | 'search'
   | 'compare'
   | 'presets'
+  | 'admin'
   | 'settings';
 
 const PATHS: Record<NavIconName, string> = {
@@ -55,6 +56,8 @@ const PATHS: Record<NavIconName, string> = {
   // Two panels side by side (a split rectangle) — the compare layout in glyph form.
   compare: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM12 5v14',
   presets: 'M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0M16 4v4M8 10v4M14 16v4',
+  // A terminal window: rounded frame with a chevron prompt and a cursor underscore.
+  admin: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM7 9l3 3-3 3M13 15h4',
   settings: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
 };
 
