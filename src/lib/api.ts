@@ -408,6 +408,65 @@ export async function listPresets(p: Pairing): Promise<Preset[]> {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Personal assistant (companion bridge /api/companion/assistant).
+//
+// The owner's single configurable assistant: its persona (name, what it calls
+// you, system prompt/personality), greeting, default model, and timezone. GET
+// returns null until it's been set up; PATCH creates-or-updates with only the
+// fields you pass (omitted fields are left unchanged). All scoped to the paired
+// token's owner by the bridge.
+// ---------------------------------------------------------------------------
+
+export interface Assistant {
+  id: string;
+  name: string | null;
+  user_name: string | null;
+  personality: string | null;
+  model: string | null;
+  greeting: string | null;
+  timezone: string | null;
+  avatar: string | null;
+  enabled: boolean;
+}
+
+/** Fetch the owner's assistant. Returns null when it hasn't been set up yet. */
+export async function getAssistant(p: Pairing): Promise<Assistant | null> {
+  const res = await request(p, '/api/companion/assistant');
+  const data = await json<{ assistant: Assistant | null }>(res);
+  return data.assistant ?? null;
+}
+
+/**
+ * Update (creating it if absent) the owner's assistant. Only the provided
+ * fields are sent — omitted keys are left unchanged server-side. Mirrors
+ * {@link renameSession}'s PATCH-form pattern. Returns the updated assistant.
+ */
+export async function updateAssistant(
+  p: Pairing,
+  fields: {
+    name?: string;
+    user_name?: string;
+    personality?: string;
+    greeting?: string;
+    model?: string;
+    timezone?: string;
+  },
+): Promise<Assistant> {
+  // Build the form body from only the keys the caller actually provided so
+  // omitted fields stay untouched on the server.
+  const provided = Object.fromEntries(
+    Object.entries(fields).filter(([, v]) => v != null),
+  ) as Record<string, string>;
+  const res = await request(p, '/api/companion/assistant', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form(provided),
+  });
+  const data = await json<{ assistant: Assistant }>(res);
+  return data.assistant;
+}
+
 /** Categories the memory composer offers. Matches the server's allowed set. */
 export const MEMORY_CATEGORIES = [
   'fact',

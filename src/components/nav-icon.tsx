@@ -19,6 +19,7 @@ export type NavIconName =
   | 'calendar'
   | 'email'
   | 'memory'
+  | 'assistant'
   | 'research'
   | 'search'
   | 'compare'
@@ -42,6 +43,10 @@ const PATHS: Record<NavIconName, string> = {
   email: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 7l9 6 9-6',
   memory:
     'M5 5h14v14H5zM9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 14h3M2 9h3M2 14h3',
+  // A friendly robot: an antenna stalk + bulb above a rounded-square head with
+  // two dot eyes.
+  assistant:
+    'M12 3v3M12 2.2a.8.8 0 1 0 0 .01M7 7h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM9.5 13h.01M14.5 13h.01',
   research: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
   search: 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6',
   // Two panels side by side (a split rectangle) — the compare layout in glyph form.
