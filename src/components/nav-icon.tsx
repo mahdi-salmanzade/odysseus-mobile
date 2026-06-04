@@ -20,6 +20,7 @@ export type NavIconName =
   | 'email'
   | 'memory'
   | 'assistant'
+  | 'skills'
   | 'research'
   | 'search'
   | 'compare'
@@ -47,6 +48,8 @@ const PATHS: Record<NavIconName, string> = {
   // two dot eyes.
   assistant:
     'M12 3v3M12 2.2a.8.8 0 1 0 0 .01M7 7h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM9.5 13h.01M14.5 13h.01',
+  // A lightbulb: a round glass with a small filament tick, sitting on a base.
+  skills: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.4 1 2.5h6c0-1.1.3-1.8 1-2.5A6 6 0 0 0 12 3z',
   research: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
   search: 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6',
   // Two panels side by side (a split rectangle) — the compare layout in glyph form.

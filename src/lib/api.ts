@@ -110,6 +110,13 @@ export interface DocumentSummary {
   updated_at: string | null;
 }
 
+/** One learned skill in the owner's library (list view). */
+export interface Skill {
+  name: string;
+  description: string | null;
+  category: string | null;
+}
+
 /** A single document's full body (detail view). */
 export interface DocumentDetail {
   id: string;
@@ -366,6 +373,21 @@ export async function getDocument(p: Pairing, id: string): Promise<DocumentDetai
   const res = await request(p, `/api/companion/documents/${encodeURIComponent(id)}`);
   const d = await json<DocumentDetail>(res);
   return { ...d, id: String(d.id) };
+}
+
+/** List the owner's learned skills (names + descriptions; source via getSkillMarkdown). */
+export async function listSkills(p: Pairing): Promise<Skill[]> {
+  const res = await request(p, '/api/companion/skills');
+  return listFrom<Skill>(res, 'items');
+}
+
+/** Fetch one skill's SKILL.md source. */
+export async function getSkillMarkdown(
+  p: Pairing,
+  name: string,
+): Promise<{ name: string; markdown: string }> {
+  const res = await request(p, `/api/companion/skills/${encodeURIComponent(name)}/markdown`);
+  return json(res);
 }
 
 /** List the owner's generated/uploaded gallery images (newest-first per the

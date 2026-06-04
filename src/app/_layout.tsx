@@ -44,6 +44,7 @@ function RootNavigator() {
           <Stack.Screen name="email" />
           <Stack.Screen name="memory" />
           <Stack.Screen name="assistant" />
+          <Stack.Screen name="skills" />
           <Stack.Screen name="research" />
           <Stack.Screen name="search" />
           <Stack.Screen name="compare" />
