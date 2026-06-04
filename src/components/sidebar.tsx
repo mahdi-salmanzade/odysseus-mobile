@@ -9,7 +9,7 @@
 import { router, usePathname, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
   ReduceMotion,
   runOnJS,
@@ -161,7 +161,13 @@ export function Sidebar() {
             <Text style={styles.brand}>Odysseus</Text>
           </View>
 
-          <View style={styles.nav}>
+          {/* Scrolls independently of the pinned footer — the item list now
+              exceeds a phone's height, so without this it overlapped Unpair. */}
+          <ScrollView
+            style={styles.nav}
+            contentContainerStyle={styles.navContent}
+            showsVerticalScrollIndicator={false}
+          >
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href;
               return (
@@ -186,7 +192,7 @@ export function Sidebar() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <View style={[styles.footer, { paddingBottom: insets.bottom + theme.space(4) }]}>
             <Text style={styles.footerLabel}>Paired with</Text>
@@ -232,7 +238,10 @@ const styles = StyleSheet.create({
     fontSize: theme.font.title,
     fontWeight: '700',
   },
-  nav: { flex: 1, gap: theme.space(1) },
+  // The ScrollView fills the space between the brand row and the pinned footer;
+  // its items live in navContent so the gap applies to the scrolled content.
+  nav: { flex: 1 },
+  navContent: { gap: theme.space(1), paddingBottom: theme.space(2) },
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
