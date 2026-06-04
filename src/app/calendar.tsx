@@ -122,6 +122,9 @@ export default function CalendarScreen() {
 
   // Once loaded, refocus refreshes silently instead of blanking to a spinner.
   const loadedOnce = useRef(false);
+  // Flipped true when the screen blurs/unmounts, so a late load() resolution
+  // doesn't setState on an unmounted screen.
+  const cancelled = useRef(false);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
@@ -136,14 +139,18 @@ export default function CalendarScreen() {
           listEvents(pairing, { start: now.toISOString(), end: end.toISOString() }),
           listCalendars(pairing),
         ]);
+        if (cancelled.current) return;
         setEvents(evs);
         setCalendars(cals);
         loadedOnce.current = true;
       } catch (e) {
+        if (cancelled.current) return;
         if (!loadedOnce.current) setError(e instanceof ApiError ? e.message : 'Could not load calendar.');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (!cancelled.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [pairing],
@@ -151,7 +158,11 @@ export default function CalendarScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      cancelled.current = false;
       load('initial');
+      return () => {
+        cancelled.current = true;
+      };
     }, [load]),
   );
 
