@@ -162,7 +162,7 @@ export default function SkillsScreen() {
         onRequestClose={closeSkill}
       >
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <ScreenHeader title={openName ?? 'Skill'} onMenu={closeSkill} />
+          <ScreenHeader title={openName ?? 'Skill'} onMenu={closeSkill} showSettings={false} />
 
           {detailLoading ? (
             <View style={styles.center}>

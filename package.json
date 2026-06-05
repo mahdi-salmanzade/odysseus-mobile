@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "expo": "~56.0.3",
+    "expo-application": "~56.0.3",
     "expo-build-properties": "~56.0.16",
     "expo-camera": "~56.0.7",
     "expo-clipboard": "~56.0.3",

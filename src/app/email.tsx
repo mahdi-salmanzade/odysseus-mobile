@@ -341,7 +341,7 @@ export default function EmailScreen() {
         onRequestClose={closeMessage}
       >
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <ScreenHeader title={detail?.subject || 'Message'} onMenu={closeMessage} />
+          <ScreenHeader title={detail?.subject || 'Message'} onMenu={closeMessage} showSettings={false} />
           {detailLoading ? (
             <View style={styles.center}>
               <ActivityIndicator color={theme.color.accent} />
@@ -393,6 +393,7 @@ export default function EmailScreen() {
           <ScreenHeader
             title="New message"
             onMenu={resetCompose}
+            showSettings={false}
             right={
               <Pressable
                 hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}

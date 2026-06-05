@@ -186,6 +186,7 @@ export default function DocumentsScreen() {
           <ScreenHeader
             title={detail?.title ?? 'Document'}
             onMenu={closeDocument}
+            showSettings={false}
             right={
               detail?.content ? (
                 <Pressable

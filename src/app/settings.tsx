@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -25,19 +26,26 @@ import {
   type CompanionInfo,
   type ModelChoice,
 } from '@/lib/api';
+import { ScreenHeader } from '@/components/screen-header';
 import { usePairing } from '@/lib/pairing-context';
 import { enablePushForPairing } from '@/lib/push';
 import { loadModelPref, saveModelPref, type ModelPref } from '@/lib/prefs';
 
-// App version + native build number, read from the embedded app config. With
-// EAS remote versioning the build number is assigned at build time, so fall back
-// to '—' rather than a misleading hardcoded value.
-const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+// App version + native build number. Read these from the *running* binary via
+// expo-application — Constants.expoConfig holds the manifest, and with EAS remote
+// versioning the manifest carries no build number, so the old config lookup
+// always rendered '—' on real builds. nativeBuildVersion is iOS CFBundleVersion /
+// Android versionCode of the actual installed app; fall back to the embedded
+// config (then '—') for environments where the native value is unavailable.
+const APP_VERSION =
+  Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '1.0.0';
 const BUILD_NUMBER =
+  Application.nativeBuildVersion ??
   Platform.select({
     ios: Constants.expoConfig?.ios?.buildNumber,
     android: Constants.expoConfig?.android?.versionCode?.toString(),
-  }) ?? '—';
+  }) ??
+  '—';
 
 export default function SettingsScreen() {
   const { pairing, unpair, setAddress } = usePairing();
@@ -172,151 +180,160 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-        <Pressable
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={({ pressed }) => pressed && { opacity: 0.6 }}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        >
-          <Text style={styles.close}>Done</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Settings"
+        showSettings={false}
+        right={
+          <Pressable
+            hitSlop={12}
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.doneSlot, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+          >
+            <Text style={styles.close}>Done</Text>
+          </Pressable>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.section}>Connected server</Text>
-        <View style={styles.card}>
-          {editAddr ? (
-            <View style={styles.editAddr}>
-              <Text style={styles.editLabel}>Server IP / host</Text>
-              <TextInput
-                style={styles.input}
-                value={hostIn}
-                onChangeText={setHostIn}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="numbers-and-punctuation"
-                placeholder="192.168.1.21"
-                placeholderTextColor={theme.color.textFaint}
-                accessibilityLabel="Server IP or host"
-              />
-              <Text style={styles.editLabel}>Port</Text>
-              <TextInput
-                style={styles.input}
-                value={portIn}
-                onChangeText={setPortIn}
-                keyboardType="number-pad"
-                placeholder="7860"
-                placeholderTextColor={theme.color.textFaint}
-                accessibilityLabel="Server port"
-              />
-              <View style={styles.editBtns}>
-                <Pressable
-                  style={({ pressed }) => [styles.editCancel, pressed && { opacity: 0.6 }]}
-                  onPress={() => setEditAddr(false)}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.editCancelText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.editSave, pressed && { opacity: 0.8 }]}
-                  onPress={saveAddr}
-                  disabled={savingAddr}
-                  accessibilityRole="button"
-                >
-                  {savingAddr ? (
-                    <ActivityIndicator color={theme.color.onAccent} />
-                  ) : (
-                    <Text style={styles.editSaveText}>Save &amp; reconnect</Text>
-                  )}
-                </Pressable>
+        <View style={styles.group}>
+          <Text style={styles.section}>Connected server</Text>
+          <View style={styles.card}>
+            {editAddr ? (
+              <View style={styles.editAddr}>
+                <Text style={styles.editLabel}>Server IP / host</Text>
+                <TextInput
+                  style={styles.input}
+                  value={hostIn}
+                  onChangeText={setHostIn}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="numbers-and-punctuation"
+                  placeholder="192.168.1.21"
+                  placeholderTextColor={theme.color.textFaint}
+                  accessibilityLabel="Server IP or host"
+                />
+                <Text style={styles.editLabel}>Port</Text>
+                <TextInput
+                  style={styles.input}
+                  value={portIn}
+                  onChangeText={setPortIn}
+                  keyboardType="number-pad"
+                  placeholder="7860"
+                  placeholderTextColor={theme.color.textFaint}
+                  accessibilityLabel="Server port"
+                />
+                <View style={styles.editBtns}>
+                  <Pressable
+                    style={({ pressed }) => [styles.editCancel, pressed && { opacity: 0.6 }]}
+                    onPress={() => setEditAddr(false)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.editCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.editSave, pressed && { opacity: 0.8 }]}
+                    onPress={saveAddr}
+                    disabled={savingAddr}
+                    accessibilityRole="button"
+                  >
+                    {savingAddr ? (
+                      <ActivityIndicator color={theme.color.onAccent} />
+                    ) : (
+                      <Text style={styles.editSaveText}>Save &amp; reconnect</Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          ) : (
-            <>
-              <Row label="Host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
-              <Row
-                label="Server"
-                value={info ? `${info.name} ${info.version}` : tokenRejected ? 'Token rejected' : '…'}
-              />
-              <Row label="Paired as" value={info?.owner ?? '—'} last />
-            </>
+            ) : (
+              <>
+                <Row label="Host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
+                <Row
+                  label="Server"
+                  value={info ? `${info.name} ${info.version}` : tokenRejected ? 'Token rejected' : '…'}
+                />
+                <Row label="Paired as" value={info?.owner ?? '—'} last />
+              </>
+            )}
+          </View>
+
+          {!editAddr && (
+            <Pressable
+              onPress={startEditAddr}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.changeAddr}>Change server address (IP changed?)</Text>
+            </Pressable>
+          )}
+
+          {tokenRejected && (
+            <Text style={styles.warn}>
+              This server rejected the pairing token. Unpair and scan a fresh code to reconnect.
+            </Text>
           )}
         </View>
 
-        {!editAddr && (
-          <Pressable
-            onPress={startEditAddr}
-            style={({ pressed }) => pressed && { opacity: 0.6 }}
-            accessibilityRole="button"
-          >
-            <Text style={styles.changeAddr}>Change server address (IP changed?)</Text>
-          </Pressable>
-        )}
+        <View style={styles.group}>
+          <Text style={styles.section}>Model</Text>
+          <View style={styles.card}>
+            {modelsError ? (
+              <Text style={styles.modelError}>{modelsError}</Text>
+            ) : models === null ? (
+              <View style={styles.modelLoading}>
+                <ActivityIndicator color={theme.color.accent} />
+              </View>
+            ) : models.length === 0 ? (
+              <Text style={styles.modelError}>No models available on this server.</Text>
+            ) : (
+              models.map((m, i) => {
+                const on = effective?.endpoint_id === m.endpoint_id && effective?.model === m.model;
+                return (
+                  <Pressable
+                    key={`${m.endpoint_id}:${m.model}`}
+                    style={({ pressed }) => [
+                      styles.modelRow,
+                      i === models.length - 1 && styles.rowLast,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    onPress={() => pickModel(m)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                  >
+                    <Text style={[styles.modelLabel, on && styles.modelLabelOn]} numberOfLines={1}>
+                      {m.label}
+                    </Text>
+                    {on && <Text style={styles.check}>✓</Text>}
+                  </Pressable>
+                );
+              })
+            )}
+          </View>
+          <Text style={styles.hint}>The selected model is used for new chats.</Text>
+        </View>
 
-        {tokenRejected && (
-          <Text style={styles.warn}>
-            This server rejected the pairing token. Unpair and scan a fresh code to reconnect.
+        <View style={styles.group}>
+          <Text style={styles.section}>Notifications</Text>
+          <View style={styles.card}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.modelRow,
+                styles.rowLast,
+                pressed && !testingPush && { opacity: 0.7 },
+              ]}
+              onPress={testPush}
+              disabled={testingPush}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.modelLabel, styles.modelLabelOn]}>Send a test notification</Text>
+              {testingPush ? <ActivityIndicator color={theme.color.accent} /> : <Text style={styles.check}>→</Text>}
+            </Pressable>
+          </View>
+          <Text style={styles.hint}>
+            Get a push when research finishes or a new memory, note, or document is saved.
           </Text>
-        )}
-
-        <Text style={styles.section}>Model</Text>
-        <View style={styles.card}>
-          {modelsError ? (
-            <Text style={styles.modelError}>{modelsError}</Text>
-          ) : models === null ? (
-            <View style={styles.modelLoading}>
-              <ActivityIndicator color={theme.color.accent} />
-            </View>
-          ) : models.length === 0 ? (
-            <Text style={styles.modelError}>No models available on this server.</Text>
-          ) : (
-            models.map((m, i) => {
-              const on = effective?.endpoint_id === m.endpoint_id && effective?.model === m.model;
-              return (
-                <Pressable
-                  key={`${m.endpoint_id}:${m.model}`}
-                  style={({ pressed }) => [
-                    styles.modelRow,
-                    i === models.length - 1 && styles.rowLast,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={() => pickModel(m)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                >
-                  <Text style={[styles.modelLabel, on && styles.modelLabelOn]} numberOfLines={1}>
-                    {m.label}
-                  </Text>
-                  {on && <Text style={styles.check}>✓</Text>}
-                </Pressable>
-              );
-            })
-          )}
         </View>
-        <Text style={styles.hint}>The selected model is used for new chats.</Text>
-
-        <Text style={styles.section}>Notifications</Text>
-        <View style={styles.card}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.modelRow,
-              styles.rowLast,
-              pressed && !testingPush && { opacity: 0.7 },
-            ]}
-            onPress={testPush}
-            disabled={testingPush}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.modelLabel, styles.modelLabelOn]}>Send a test notification</Text>
-            {testingPush ? <ActivityIndicator color={theme.color.accent} /> : <Text style={styles.check}>→</Text>}
-          </Pressable>
-        </View>
-        <Text style={styles.hint}>
-          Get a push when research finishes or a new memory, note, or document is saved.
-        </Text>
 
         <Pressable
           style={({ pressed }) => [styles.danger, pressed && { opacity: 0.85 }]}
@@ -326,10 +343,12 @@ export default function SettingsScreen() {
           <Text style={styles.dangerText}>Unpair</Text>
         </Pressable>
 
-        <Text style={styles.section}>App</Text>
-        <View style={styles.card}>
-          <Row label="Version" value={`v${APP_VERSION}`} />
-          <Row label="Build" value={BUILD_NUMBER} last />
+        <View style={styles.group}>
+          <Text style={styles.section}>App</Text>
+          <View style={styles.card}>
+            <Row label="Version" value={`v${APP_VERSION}`} />
+            <Row label="Build" value={BUILD_NUMBER} last />
+          </View>
         </View>
 
         <Text style={styles.footnote}>
@@ -354,22 +373,17 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.space(5),
-    paddingVertical: theme.space(3.5),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-    // Mirror ScreenHeader: a consistent 16px gap below the divider so the first
-    // section never butts the rule, identical to every other screen.
-    marginBottom: theme.space(4),
-  },
-  title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
+  // The "Done" control fills ScreenHeader's 36px-tall right slot so it stays
+  // vertically centered and keeps a comfortable tap target.
+  doneSlot: { height: 36, justifyContent: 'center' },
   close: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
-  // No paddingTop: the header already owns the 16px gap below its divider.
-  body: { paddingHorizontal: theme.space(5), paddingBottom: theme.space(5), gap: theme.space(3.5) },
+  // No paddingTop: ScreenHeader already owns the 16px gap below its divider.
+  // Gutter is space(4) so the section labels and card edges line up with the
+  // "Settings" title above them. The 20px gap is between groups; within a group
+  // (label → card → hint) the spacing is tight (see `group`), so each hint reads
+  // as belonging to the card above it, not floating toward the next section.
+  body: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(5), gap: theme.space(5) },
+  group: { gap: theme.space(2) },
   section: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   card: { backgroundColor: theme.color.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.space(4), paddingVertical: theme.space(3.5), borderBottomWidth: 1, borderBottomColor: theme.color.border, gap: theme.space(3) },
@@ -377,9 +391,9 @@ const styles = StyleSheet.create({
   rowLabel: { color: theme.color.textDim, fontSize: theme.font.body },
   rowValue: { color: theme.color.text, fontSize: theme.font.body, flexShrink: 1, textAlign: 'right' },
 
-  warn: { color: theme.color.danger, fontSize: theme.font.small, lineHeight: 19, marginTop: theme.space(1.5) },
+  warn: { color: theme.color.danger, fontSize: theme.font.small, lineHeight: 19 },
 
-  changeAddr: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '600', marginTop: theme.space(1.5) },
+  changeAddr: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '600' },
   editAddr: { padding: theme.space(4), gap: theme.space(2) },
   editLabel: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600' },
   input: {
@@ -426,9 +440,9 @@ const styles = StyleSheet.create({
   modelLabel: { color: theme.color.textDim, fontSize: theme.font.body, flexShrink: 1 },
   modelLabelOn: { color: theme.color.text, fontWeight: '600' },
   check: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '800' },
-  hint: { color: theme.color.textFaint, fontSize: theme.font.small, marginTop: theme.space(1.5) },
+  hint: { color: theme.color.textFaint, fontSize: theme.font.small },
 
-  danger: { backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, paddingVertical: theme.space(3.5), alignItems: 'center', marginTop: theme.space(1.5) },
+  danger: { backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, paddingVertical: theme.space(3.5), alignItems: 'center' },
   dangerText: { color: theme.color.danger, fontWeight: '700', fontSize: theme.font.body },
-  footnote: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19, marginTop: theme.space(2) },
+  footnote: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19 },
 });
