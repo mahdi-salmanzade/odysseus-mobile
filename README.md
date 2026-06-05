@@ -39,9 +39,14 @@ gets the full app, not a stretched phone view. (iPad screenshots:
 1. Install Apple's **[TestFlight](https://apps.apple.com/app/testflight/id899247664)** app.
 2. Open **[testflight.apple.com/join/qWq1A51n](https://testflight.apple.com/join/qWq1A51n)** and tap *Install*.
 
+The **latest build (build 9)** is live on TestFlight. Please give it a spin and
+send feedback — bugs, rough edges, anything — via the
+[issues](https://github.com/mahdi-salmanzade/odysseus-mobile/issues) or
+TestFlight's built-in feedback.
+
 ### Android — APK
 
-Download **[`odysseus-mobile-v1.0.0.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/latest)**
+Download **[`odysseus-mobile-v1.0.0-build9.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/latest)**
 from the latest release and install it (allow *install from unknown sources* if
 prompted).
 
