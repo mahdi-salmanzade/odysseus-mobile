@@ -3,9 +3,20 @@
  * and lets screens pair / unpair. `ready` gates the router so we don't flash the
  * pairing screen before the keychain read resolves.
  */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { AppState } from 'react-native';
+import * as Network from 'expo-network';
 
-import { setUnauthorizedHandler } from '@/lib/api';
+import { setRelocateHandler, setUnauthorizedHandler } from '@/lib/api';
 import { discoverServerHost } from '@/lib/discover';
 import { dlog } from '@/lib/log';
 import { clearPairing, isLanHost, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
@@ -36,6 +47,51 @@ export function PairingProvider({ children }: { children: ReactNode }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Always-current pairing for the relocate machinery below. The API-layer
+  // handler and the network/foreground listeners are registered once and would
+  // otherwise close over a stale pairing; reading through a ref keeps them
+  // scanning with the live token/port.
+  const pairingRef = useRef<Pairing | null>(pairing);
+  useEffect(() => {
+    pairingRef.current = pairing;
+  }, [pairing]);
+
+  // Coalesced LAN rediscovery. A network switch makes many in-flight calls fail
+  // at once; without coalescing each would kick off its own 254-host sweep. We
+  // share a single in-flight scan so a burst collapses to one sweep, and it's
+  // cheap when nothing moved (discoverServerHost probes the stored host first).
+  // Returns the relocated Pairing (host updated + persisted if it moved), or
+  // null if the server wasn't found on the current network.
+  const relocateInFlight = useRef<Promise<Pairing | null> | null>(null);
+  const runRelocate = useCallback(async (): Promise<Pairing | null> => {
+    if (relocateInFlight.current) return relocateInFlight.current;
+    const cur = pairingRef.current;
+    if (!cur) return null;
+    const job = (async (): Promise<Pairing | null> => {
+      const host = await discoverServerHost(cur);
+      if (!host) {
+        dlog('pair', 'relocate: no server found on this network');
+        return null;
+      }
+      if (host === cur.host) {
+        dlog('pair', `relocate: server confirmed at same host ${host}`);
+        return cur;
+      }
+      const next = { ...cur, host };
+      await savePairing(next);
+      dlog('pair', `relocate: host updated ${cur.host} → ${host}`);
+      setPairing(next); // host change re-runs screens' pairing-keyed effects → reconnect
+      return next;
+    })().finally(() => {
+      // Clear the coalescing slot once the sweep settles, so the next network
+      // change starts a fresh scan. (`.finally` instead of try/finally keeps the
+      // provider compilable by React Compiler.)
+      relocateInFlight.current = null;
+    });
+    relocateInFlight.current = job;
+    return job;
+  }, []);
+
   useEffect(() => {
     loadPairing()
       .then((p) => {
@@ -44,6 +100,38 @@ export function PairingProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setReady(true));
   }, []);
+
+  // Let the API layer self-heal: on a connection failure it asks us to relocate
+  // and retries against the new host, so a Wi-Fi switch recovers on every screen,
+  // not just chat.
+  useEffect(() => {
+    setRelocateHandler(() => runRelocate());
+    return () => setRelocateHandler(null);
+  }, [runRelocate]);
+
+  // Proactive relocation: the moment the OS reports a (re)connected network, the
+  // server's IP may have changed — fix the stored host before the user taps
+  // anything. Coalesced with reactive relocates, and a no-op cost when the host
+  // is unchanged. Also re-check on app foreground, since the network commonly
+  // changes while the app is backgrounded (e.g. walking out of Wi-Fi range).
+  useEffect(() => {
+    const netSub = Network.addNetworkStateListener((state) => {
+      if (state.isConnected && pairingRef.current) {
+        dlog('pair', `network changed (type=${state.type}) — proactive relocate`);
+        void runRelocate();
+      }
+    });
+    const appSub = AppState.addEventListener('change', (s) => {
+      if (s === 'active' && pairingRef.current) {
+        dlog('pair', 'app foregrounded — proactive relocate');
+        void runRelocate();
+      }
+    });
+    return () => {
+      netSub.remove();
+      appSub.remove();
+    };
+  }, [runRelocate]);
 
   // When any API call sees a 401 (revoked/invalid token), clear the stored
   // pairing. The router's Stack.Protected guard keys off `pairing`, so this
@@ -74,23 +162,12 @@ export function PairingProvider({ children }: { children: ReactNode }) {
         await clearPairing();
         setPairing(null);
       },
+      // Manual rescan from the UI (the chat screen's "Couldn't connect" retry).
+      // Shares the single coalesced sweep with the automatic relocates above.
       relocate: async () => {
         if (!pairing) return false;
         dlog('pair', `relocate: scanning for server (was ${pairing.host})`);
-        const host = await discoverServerHost(pairing);
-        if (!host) {
-          dlog('pair', 'relocate: no server found');
-          return false;
-        }
-        if (host !== pairing.host) {
-          const next = { ...pairing, host };
-          await savePairing(next);
-          dlog('pair', `relocate: host updated ${pairing.host} → ${host}`);
-          setPairing(next); // host change re-runs screens' pairing-keyed effects → reconnect
-        } else {
-          dlog('pair', `relocate: server confirmed at same host ${host}`);
-        }
-        return true;
+        return (await runRelocate()) !== null;
       },
       setAddress: async (host, port) => {
         if (!pairing) return false;
@@ -106,7 +183,7 @@ export function PairingProvider({ children }: { children: ReactNode }) {
         return true;
       },
     }),
-    [pairing, ready],
+    [pairing, ready, runRelocate],
   );
 
   return <PairingContext.Provider value={value}>{children}</PairingContext.Provider>;

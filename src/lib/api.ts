@@ -40,6 +40,20 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
   onUnauthorized = fn;
 }
 
+// Centralized LAN rediscovery. When the server's IP moves (Wi-Fi ↔ hotspot
+// switch) the stored host goes dead and every call fails to connect. The pairing
+// provider registers a handler here that rescans the subnet for the paired
+// server, updates the stored host, and returns the relocated Pairing (or null if
+// none was found). `request`/`streamChat` call it on a connection failure and
+// retry once against the new address, so a network switch self-heals everywhere
+// instead of only on the chat screen. The handler coalesces concurrent calls
+// into a single scan, so a burst of simultaneous failures triggers one sweep.
+type RelocateHandler = (failed: Pairing) => Promise<Pairing | null>;
+let onRelocate: RelocateHandler | null = null;
+export function setRelocateHandler(fn: RelocateHandler | null): void {
+  onRelocate = fn;
+}
+
 export interface CompanionInfo {
   name: string;
   version: string;
@@ -172,7 +186,7 @@ export function imageSource(
   return { uri: `${baseUrl(p)}${imageUrl}`, headers: authHeaders(p) };
 }
 
-async function request(
+async function attempt(
   p: Pairing,
   path: string,
   init?: { method?: string; body?: BodyInit; headers?: Record<string, string> },
@@ -212,6 +226,36 @@ async function request(
     throw new ApiError('Could not reach Odysseus. Is the server on and on the same network?', 'network');
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Authenticated request to the paired server, with automatic LAN rediscovery.
+ *
+ * On a connection failure (host unreachable/timed out — NOT a 401 or an HTTP
+ * error status, where the host is fine) the server's IP may have moved after a
+ * Wi-Fi/hotspot switch. We rescan the subnet once via the registered relocate
+ * handler and, if the server is found again, retry the request against the new
+ * address. This makes every screen self-heal after a network change rather than
+ * dead-ending on a "couldn't reach" error. Only one retry, so a genuinely
+ * offline server still fails fast.
+ */
+async function request(
+  p: Pairing,
+  path: string,
+  init?: { method?: string; body?: BodyInit; headers?: Record<string, string> },
+): Promise<Response> {
+  try {
+    return await attempt(p, path, init);
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'network' && onRelocate) {
+      const moved = await onRelocate(p).catch(() => null);
+      if (moved) {
+        dlog('http', `relocated → retry ${init?.method ?? 'GET'} ${path} @ ${moved.host}:${moved.port}`);
+        return attempt(moved, path, init);
+      }
+    }
+    throw e;
   }
 }
 
@@ -720,7 +764,14 @@ export function streamChat(
   args: { message: string; session: string; mode?: 'chat' | 'agent'; useWeb?: boolean; useResearch?: boolean },
   handlers: ChatStreamHandlers,
 ): () => void {
-  const controller = new AbortController();
+  // The connect phase may target a host that has since moved (Wi-Fi/hotspot
+  // switch), so each attempt gets a fresh AbortController; `controller` always
+  // points at the in-flight one, so the returned canceller and the reader loop
+  // below abort whichever attempt is live. `stopTarget` follows the host we
+  // actually connected to, so a cancel hits the right server after a relocate.
+  let controller = new AbortController();
+  let userCancelled = false;
+  let stopTarget = p;
 
   // Bound only the CONNECT phase: if the host is offline/wrong the fetch can hang
   // forever, stranding the composer. We abort after the connect deadline and clear
@@ -734,21 +785,25 @@ export function streamChat(
   // for an unreachable server and falsely aborted.
   const connectTimeoutMs =
     args.useWeb || args.useResearch || args.mode === 'agent' ? 45000 : TIMEOUT_MS;
-  let connected = false;
-  let connectTimedOut = false;
-  const connectTimer = setTimeout(() => {
-    if (connected) return;
-    connectTimedOut = true;
-    controller.abort();
-  }, connectTimeoutMs);
 
-  (async () => {
-    let res: Response;
+  // One connect attempt against `pp`. Returns the Response, or a reason string:
+  // 'cancelled' (user aborted) or 'unreachable' (refused/timed out). Each attempt
+  // swaps in a fresh controller + connect deadline; the timer only fires
+  // pre-connect, so an established stream is never cut off mid-generation.
+  const connectOnce = async (pp: Pairing): Promise<Response | 'cancelled' | 'unreachable'> => {
+    controller = new AbortController();
+    let connected = false;
+    let connectTimedOut = false;
+    const connectTimer = setTimeout(() => {
+      if (connected) return;
+      connectTimedOut = true;
+      controller.abort();
+    }, connectTimeoutMs);
     try {
-      res = await expoFetch(`${baseUrl(p)}/api/chat_stream`, {
+      const res = await expoFetch(`${baseUrl(pp)}/api/chat_stream`, {
         method: 'POST',
         headers: {
-          ...authHeaders(p),
+          ...authHeaders(pp),
           'Content-Type': 'application/x-www-form-urlencoded',
           Accept: 'text/event-stream',
         },
@@ -761,20 +816,37 @@ export function streamChat(
         }),
         signal: controller.signal,
       });
+      connected = true;
+      return res;
     } catch {
+      // A user-initiated abort isn't an error; a timeout/refused connection is.
+      if (userCancelled && !connectTimedOut) return 'cancelled';
+      return 'unreachable';
+    } finally {
       clearTimeout(connectTimer);
-      // A user-initiated abort isn't an error to report.
-      if (controller.signal.aborted && !connectTimedOut) return;
+    }
+  };
+
+  (async () => {
+    let outcome = await connectOnce(p);
+    // Host may have moved — rescan the LAN once and reconnect to the new address
+    // before surfacing a connection error, so a send right after a Wi-Fi switch
+    // still goes through instead of failing.
+    if (outcome === 'unreachable' && onRelocate && !userCancelled) {
+      const moved = await onRelocate(p).catch(() => null);
+      if (moved && !userCancelled) {
+        stopTarget = moved;
+        outcome = await connectOnce(moved);
+      }
+    }
+    if (outcome === 'cancelled') return;
+    if (outcome === 'unreachable') {
       handlers.onError?.(
-        new ApiError(
-          connectTimedOut ? 'Odysseus didn’t respond in time. Is the server reachable?' : 'Lost connection to Odysseus.',
-          'network',
-        ),
+        new ApiError('Lost connection to Odysseus. Is the server on the same network?', 'network'),
       );
       return;
     }
-    connected = true;
-    clearTimeout(connectTimer);
+    const res = outcome;
 
     if (res.status === 401) {
       onUnauthorized?.();
@@ -906,8 +978,9 @@ export function streamChat(
   })();
 
   return () => {
+    userCancelled = true;
     controller.abort();
-    stopStream(p, args.session);
+    stopStream(stopTarget, args.session);
   };
 }
 
