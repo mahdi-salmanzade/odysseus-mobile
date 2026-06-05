@@ -12,6 +12,7 @@
  */
 import { fetch as expoFetch } from 'expo/fetch';
 
+import { dlog } from '@/lib/log';
 import type { Pairing } from '@/lib/pairing';
 
 const TIMEOUT_MS = 8000;
@@ -182,13 +183,18 @@ async function request(
     timedOut = true;
     controller.abort();
   }, TIMEOUT_MS);
+  const method = init?.method ?? 'GET';
+  const url = `${baseUrl(p)}${path}`;
+  const started = Date.now();
+  dlog('http', `→ ${method} ${url}`);
   try {
-    const res = await fetch(`${baseUrl(p)}${path}`, {
-      method: init?.method ?? 'GET',
+    const res = await fetch(url, {
+      method,
       headers: { ...authHeaders(p), ...(init?.headers ?? {}) },
       body: init?.body,
       signal: controller.signal,
     });
+    dlog('http', `← ${res.status} ${method} ${path} (${Date.now() - started}ms)`);
     if (res.status === 401) {
       onUnauthorized?.();
       throw new ApiError('The pairing token was rejected. Re-pair from your server.', 'unauthorized', 401);
@@ -199,8 +205,10 @@ async function request(
     // A reachable-but-slow server hit the timeout; distinguish that from a host
     // we never reached so the message isn't misleading.
     if (timedOut) {
+      dlog('http', `✗ TIMEOUT ${method} ${url} after ${Date.now() - started}ms`);
       throw new ApiError('The server took too long to respond. Is it busy or far away?', 'network');
     }
+    dlog('http', `✗ UNREACHABLE ${method} ${url} (${Date.now() - started}ms):`, String(e));
     throw new ApiError('Could not reach Odysseus. Is the server on and on the same network?', 'network');
   } finally {
     clearTimeout(timer);

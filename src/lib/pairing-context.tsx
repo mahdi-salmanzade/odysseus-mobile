@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { setUnauthorizedHandler } from '@/lib/api';
 import { discoverServerHost } from '@/lib/discover';
+import { dlog } from '@/lib/log';
 import { clearPairing, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
 import { disablePushForPairing, enablePushForPairing } from '@/lib/push';
 
@@ -31,7 +32,10 @@ export function PairingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadPairing()
-      .then(setPairing)
+      .then((p) => {
+        dlog('pair', p ? `loaded pairing → ${p.host}:${p.port}` : 'no stored pairing');
+        setPairing(p);
+      })
       .finally(() => setReady(true));
   }, []);
 
@@ -66,12 +70,19 @@ export function PairingProvider({ children }: { children: ReactNode }) {
       },
       relocate: async () => {
         if (!pairing) return false;
+        dlog('pair', `relocate: scanning for server (was ${pairing.host})`);
         const host = await discoverServerHost(pairing);
-        if (!host) return false;
+        if (!host) {
+          dlog('pair', 'relocate: no server found');
+          return false;
+        }
         if (host !== pairing.host) {
           const next = { ...pairing, host };
           await savePairing(next);
+          dlog('pair', `relocate: host updated ${pairing.host} → ${host}`);
           setPairing(next); // host change re-runs screens' pairing-keyed effects → reconnect
+        } else {
+          dlog('pair', `relocate: server confirmed at same host ${host}`);
         }
         return true;
       },

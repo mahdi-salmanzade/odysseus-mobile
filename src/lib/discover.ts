@@ -16,6 +16,7 @@
  */
 import * as Network from 'expo-network';
 
+import { dlog } from '@/lib/log';
 import { isLanHost, type Pairing } from '@/lib/pairing';
 
 const PROBE_TIMEOUT_MS = 1500;
@@ -25,10 +26,13 @@ const BATCH = 24; // concurrent probes per wave — bounded so we don't open 254
 async function deviceSubnet(): Promise<{ base: string; selfOctet: number } | null> {
   try {
     const ip = await Network.getIpAddressAsync();
+    dlog('scan', `device IP from expo-network: ${ip}`);
     const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip || '');
     if (!m) return null;
     return { base: `${m[1]}.${m[2]}.${m[3]}`, selfOctet: parseInt(m[4], 10) };
-  } catch {
+  } catch (e) {
+    // Most likely the native module isn't in this build (rebuild needed).
+    dlog('scan', 'getIpAddressAsync failed:', String(e));
     return null;
   }
 }
@@ -69,12 +73,20 @@ async function isOurServer(host: string, port: number, token: string): Promise<b
  */
 export async function discoverServerHost(pairing: Pairing): Promise<string | null> {
   const { host: storedHost, port, token } = pairing;
+  dlog('scan', `start — stored host ${storedHost}:${port}`);
 
   // Cheap first: maybe the stored IP still works (failure was transient).
-  if (await isOurServer(storedHost, port, token)) return storedHost;
+  if (await isOurServer(storedHost, port, token)) {
+    dlog('scan', `stored host still works: ${storedHost}`);
+    return storedHost;
+  }
 
   const net = await deviceSubnet();
-  if (!net) return null;
+  if (!net) {
+    dlog('scan', 'could not read device IP/subnet (expo-network missing or no Wi-Fi?) — aborting');
+    return null;
+  }
+  dlog('scan', `device subnet ${net.base}.0/24 (self .${net.selfOctet}); sweeping :${port}`);
 
   // Phase 1 — unauthenticated probe across the /24 to find auth-gated companion
   // servers (Odysseus answers 401 here). Skip our own address.
@@ -94,11 +106,16 @@ export async function discoverServerHost(pairing: Pairing): Promise<string | nul
     );
     for (const h of found) if (h) candidates.push(h);
   }
+  dlog('scan', `phase 1 done — ${candidates.length} candidate(s): ${candidates.join(', ') || '(none)'}`);
 
   // Phase 2 — token-confirm the candidates; first real Odysseus wins.
   for (const host of candidates) {
     if (!isLanHost(host)) continue;
-    if (await isOurServer(host, port, token)) return host;
+    if (await isOurServer(host, port, token)) {
+      dlog('scan', `MATCH ${host} — updating host`);
+      return host;
+    }
   }
+  dlog('scan', 'no Odysseus found on this subnet');
   return null;
 }
