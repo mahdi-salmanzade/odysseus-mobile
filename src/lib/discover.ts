@@ -86,6 +86,13 @@ export async function discoverServerHost(pairing: Pairing): Promise<string | nul
     dlog('scan', 'could not read device IP/subnet (expo-network missing or no Wi-Fi?) — aborting');
     return null;
   }
+  // 169.254.x.x is a self-assigned (link-local) address: the phone joined a
+  // network but never got a real DHCP lease, so it isn't on any routable LAN.
+  // Scanning that range is pointless — bail with a clear signal.
+  if (net.base.startsWith('169.254')) {
+    dlog('scan', `phone has a self-assigned address (${net.base}.${net.selfOctet}) — not on a real Wi-Fi network. Reconnect Wi-Fi / re-join so it gets a 192.168.x / 10.x lease.`);
+    return null;
+  }
   dlog('scan', `device subnet ${net.base}.0/24 (self .${net.selfOctet}); sweeping :${port}`);
 
   // Phase 1 — unauthenticated probe across the /24 to find auth-gated companion
