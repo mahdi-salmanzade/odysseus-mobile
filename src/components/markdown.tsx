@@ -10,7 +10,7 @@
  * partial/streaming text, so an in-flight reply renders cleanly as it grows.
  */
 import { memo, type ReactNode } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { Renderer, useMarkdown, type MarkedStyles } from 'react-native-marked';
 
 import { theme } from '@/constants/theme';
@@ -52,6 +52,10 @@ function Markdown({ text }: { text: string }) {
 
 export default memo(Markdown);
 
+/** Platform system monospace — matches the host/port/token fields elsewhere
+ * rather than the stylistically-off 'Courier'. */
+const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
 const markedStyles: MarkedStyles = {
   text: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
   paragraph: { marginTop: 0, marginBottom: 6, paddingVertical: 0 },
@@ -67,14 +71,17 @@ const markedStyles: MarkedStyles = {
   h6: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '700' },
   list: { marginVertical: 2 },
   li: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
+  // Tonal tint instead of a colored side-stripe (DESIGN.md: no border-left
+  // accents) — the quote reads as quoted by sitting on a raised surface.
   blockquote: {
-    borderLeftWidth: 3,
-    borderLeftColor: theme.color.border,
-    paddingLeft: 10,
-    marginVertical: 2,
+    backgroundColor: theme.color.surfaceAlt,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginVertical: 4,
   },
   codespan: {
-    fontFamily: 'Courier',
+    fontFamily: mono,
     fontSize: theme.font.mono,
     color: theme.color.accent,
     backgroundColor: theme.color.surfaceAlt,

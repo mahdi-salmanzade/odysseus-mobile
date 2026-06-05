@@ -85,16 +85,18 @@ export function QrScanner({ onScan, paused = false }: { onScan: (data: string) =
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.space(6), gap: theme.space(4) },
   msg: { color: theme.color.textDim, textAlign: 'center', fontSize: theme.font.body },
   btn: {
     backgroundColor: theme.color.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(3),
     borderRadius: theme.radius.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   btnText: { color: theme.color.onAccent, fontWeight: '600', fontSize: theme.font.body },
-  reticleWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', gap: 20 },
+  reticleWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', gap: theme.space(5) },
   reticle: {
     width: 230,
     height: 230,
@@ -102,5 +104,5 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderRadius: theme.radius.lg,
   },
-  hint: { color: theme.color.text, backgroundColor: theme.color.scrim, paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.pill, fontSize: theme.font.small },
+  hint: { color: theme.color.text, backgroundColor: theme.color.scrim, paddingHorizontal: theme.space(3), paddingVertical: theme.space(1.5), borderRadius: theme.radius.pill, fontSize: theme.font.small },
 });

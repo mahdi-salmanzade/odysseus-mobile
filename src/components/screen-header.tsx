@@ -26,7 +26,7 @@ export function ScreenHeader({
         <Pressable
           onPress={onMenu}
           hitSlop={11}
-          style={styles.slot}
+          style={({ pressed }) => [styles.slot, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
           accessibilityLabel="Open menu"
         >
@@ -55,6 +55,10 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space(3),
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
+    // A consistent gap below the divider so content never butts the nav. Owned
+    // here (not per-screen) so every screen breathes identically — the missing
+    // version of this is what left the memory search bar flush against the rule.
+    marginBottom: theme.space(4),
   },
   slot: { minWidth: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
