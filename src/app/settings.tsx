@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,8 +40,13 @@ const BUILD_NUMBER =
   }) ?? '—';
 
 export default function SettingsScreen() {
-  const { pairing, unpair } = usePairing();
+  const { pairing, unpair, setAddress } = usePairing();
   const [info, setInfo] = useState<CompanionInfo | null>(null);
+  // Manual "the server's IP changed" editor — updates host/port, keeps the token.
+  const [editAddr, setEditAddr] = useState(false);
+  const [hostIn, setHostIn] = useState('');
+  const [portIn, setPortIn] = useState('');
+  const [savingAddr, setSavingAddr] = useState(false);
   // The token was reachable but rejected (401) — distinct from a slow/offline
   // server, so we can tell the user to re-pair instead of just showing '…'.
   const [tokenRejected, setTokenRejected] = useState(false);
@@ -116,6 +122,30 @@ export default function SettingsScreen() {
     }
   }
 
+  function startEditAddr() {
+    if (!pairing) return;
+    setHostIn(pairing.host);
+    setPortIn(String(pairing.port));
+    setEditAddr(true);
+  }
+
+  async function saveAddr() {
+    if (savingAddr) return;
+    const port = parseInt(portIn.trim(), 10);
+    setSavingAddr(true);
+    try {
+      const ok = await setAddress(hostIn, port);
+      if (!ok) {
+        Alert.alert('Invalid address', 'Enter a LAN IP/host (e.g. 192.168.1.21) and a port from 1–65535.');
+        return;
+      }
+      Haptics.selectionAsync().catch(() => {});
+      setEditAddr(false); // pairing changed → the info/models effects re-run and reconnect
+    } finally {
+      setSavingAddr(false);
+    }
+  }
+
   function confirmUnpair() {
     Alert.alert('Unpair this server?', 'You’ll need to scan the pairing code again to reconnect.', [
       { text: 'Cancel', style: 'cancel' },
@@ -147,6 +177,7 @@ export default function SettingsScreen() {
         <Pressable
           hitSlop={12}
           onPress={() => router.back()}
+          style={({ pressed }) => pressed && { opacity: 0.6 }}
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
@@ -157,10 +188,73 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.section}>Connected server</Text>
         <View style={styles.card}>
-          <Row label="Host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
-          <Row label="Server" value={info ? `${info.name} ${info.version}` : tokenRejected ? 'Token rejected' : '…'} />
-          <Row label="Paired as" value={info?.owner ?? '—'} last />
+          {editAddr ? (
+            <View style={styles.editAddr}>
+              <Text style={styles.editLabel}>Server IP / host</Text>
+              <TextInput
+                style={styles.input}
+                value={hostIn}
+                onChangeText={setHostIn}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
+                placeholder="192.168.1.21"
+                placeholderTextColor={theme.color.textFaint}
+                accessibilityLabel="Server IP or host"
+              />
+              <Text style={styles.editLabel}>Port</Text>
+              <TextInput
+                style={styles.input}
+                value={portIn}
+                onChangeText={setPortIn}
+                keyboardType="number-pad"
+                placeholder="7860"
+                placeholderTextColor={theme.color.textFaint}
+                accessibilityLabel="Server port"
+              />
+              <View style={styles.editBtns}>
+                <Pressable
+                  style={({ pressed }) => [styles.editCancel, pressed && { opacity: 0.6 }]}
+                  onPress={() => setEditAddr(false)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.editCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.editSave, pressed && { opacity: 0.8 }]}
+                  onPress={saveAddr}
+                  disabled={savingAddr}
+                  accessibilityRole="button"
+                >
+                  {savingAddr ? (
+                    <ActivityIndicator color={theme.color.onAccent} />
+                  ) : (
+                    <Text style={styles.editSaveText}>Save &amp; reconnect</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Row label="Host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
+              <Row
+                label="Server"
+                value={info ? `${info.name} ${info.version}` : tokenRejected ? 'Token rejected' : '…'}
+              />
+              <Row label="Paired as" value={info?.owner ?? '—'} last />
+            </>
+          )}
         </View>
+
+        {!editAddr && (
+          <Pressable
+            onPress={startEditAddr}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.changeAddr}>Change server address (IP changed?)</Text>
+          </Pressable>
+        )}
 
         {tokenRejected && (
           <Text style={styles.warn}>
@@ -184,7 +278,11 @@ export default function SettingsScreen() {
               return (
                 <Pressable
                   key={`${m.endpoint_id}:${m.model}`}
-                  style={[styles.modelRow, i === models.length - 1 && styles.rowLast]}
+                  style={({ pressed }) => [
+                    styles.modelRow,
+                    i === models.length - 1 && styles.rowLast,
+                    pressed && { opacity: 0.7 },
+                  ]}
                   onPress={() => pickModel(m)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
@@ -203,7 +301,11 @@ export default function SettingsScreen() {
         <Text style={styles.section}>Notifications</Text>
         <View style={styles.card}>
           <Pressable
-            style={[styles.modelRow, styles.rowLast]}
+            style={({ pressed }) => [
+              styles.modelRow,
+              styles.rowLast,
+              pressed && !testingPush && { opacity: 0.7 },
+            ]}
             onPress={testPush}
             disabled={testingPush}
             accessibilityRole="button"
@@ -216,7 +318,11 @@ export default function SettingsScreen() {
           Get a push when research finishes or a new memory, note, or document is saved.
         </Text>
 
-        <Pressable style={styles.danger} onPress={confirmUnpair} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.danger, pressed && { opacity: 0.85 }]}
+          onPress={confirmUnpair}
+          accessibilityRole="button"
+        >
           <Text style={styles.dangerText}>Unpair</Text>
         </Pressable>
 
@@ -252,39 +358,77 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(3.5),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.border,
+    // Mirror ScreenHeader: a consistent 16px gap below the divider so the first
+    // section never butts the rule, identical to every other screen.
+    marginBottom: theme.space(4),
   },
   title: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700' },
   close: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
-  body: { padding: 20, gap: 14 },
+  // No paddingTop: the header already owns the 16px gap below its divider.
+  body: { paddingHorizontal: theme.space(5), paddingBottom: theme.space(5), gap: theme.space(3.5) },
   section: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   card: { backgroundColor: theme.color.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.color.border, gap: 12 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.space(4), paddingVertical: theme.space(3.5), borderBottomWidth: 1, borderBottomColor: theme.color.border, gap: theme.space(3) },
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { color: theme.color.textDim, fontSize: theme.font.body },
   rowValue: { color: theme.color.text, fontSize: theme.font.body, flexShrink: 1, textAlign: 'right' },
 
-  warn: { color: theme.color.danger, fontSize: theme.font.small, lineHeight: 19, marginTop: -4 },
+  warn: { color: theme.color.danger, fontSize: theme.font.small, lineHeight: 19, marginTop: theme.space(1.5) },
 
-  modelLoading: { padding: 18, alignItems: 'center' },
-  modelError: { color: theme.color.textDim, fontSize: theme.font.small, padding: 16 },
+  changeAddr: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '600', marginTop: theme.space(1.5) },
+  editAddr: { padding: theme.space(4), gap: theme.space(2) },
+  editLabel: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600' },
+  input: {
+    backgroundColor: theme.color.bg,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(2.5),
+    color: theme.color.text,
+    fontSize: theme.font.body,
+  },
+  editBtns: { flexDirection: 'row', gap: theme.space(2.5), marginTop: theme.space(1.5) },
+  editCancel: {
+    flex: 1,
+    paddingVertical: theme.space(3),
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    alignItems: 'center',
+  },
+  editCancelText: { color: theme.color.textDim, fontSize: theme.font.body, fontWeight: '600' },
+  editSave: {
+    flex: 1,
+    paddingVertical: theme.space(3),
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.accent,
+    alignItems: 'center',
+  },
+  editSaveText: { color: theme.color.onAccent, fontSize: theme.font.body, fontWeight: '700' },
+
+  modelLoading: { padding: theme.space(4.5), alignItems: 'center' },
+  modelError: { color: theme.color.textDim, fontSize: theme.font.small, padding: theme.space(4) },
   modelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.space(4),
+    paddingVertical: theme.space(3.5),
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
-    gap: 12,
+    gap: theme.space(3),
   },
   modelLabel: { color: theme.color.textDim, fontSize: theme.font.body, flexShrink: 1 },
   modelLabelOn: { color: theme.color.text, fontWeight: '600' },
   check: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '800' },
-  hint: { color: theme.color.textFaint, fontSize: theme.font.small, marginTop: -6 },
+  hint: { color: theme.color.textFaint, fontSize: theme.font.small, marginTop: theme.space(1.5) },
 
-  danger: { backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
+  danger: { backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, paddingVertical: theme.space(3.5), alignItems: 'center', marginTop: theme.space(1.5) },
   dangerText: { color: theme.color.danger, fontWeight: '700', fontSize: theme.font.body },
-  footnote: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19, marginTop: 8 },
+  footnote: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19, marginTop: theme.space(2) },
 });

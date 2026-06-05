@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { setUnauthorizedHandler } from '@/lib/api';
 import { discoverServerHost } from '@/lib/discover';
 import { dlog } from '@/lib/log';
-import { clearPairing, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
+import { clearPairing, isLanHost, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
 import { disablePushForPairing, enablePushForPairing } from '@/lib/push';
 
 interface PairingContextValue {
@@ -22,6 +22,12 @@ interface PairingContextValue {
    * was located (host updated if it moved), false if none was found.
    */
   relocate: () => Promise<boolean>;
+  /**
+   * Manually point the existing pairing at a new address (keeps the token).
+   * For when the IP changed and you know the new one — no re-scan, no re-entering
+   * the token. Returns false if the host/port are invalid.
+   */
+  setAddress: (host: string, port: number) => Promise<boolean>;
 }
 
 const PairingContext = createContext<PairingContextValue | null>(null);
@@ -84,6 +90,19 @@ export function PairingProvider({ children }: { children: ReactNode }) {
         } else {
           dlog('pair', `relocate: server confirmed at same host ${host}`);
         }
+        return true;
+      },
+      setAddress: async (host, port) => {
+        if (!pairing) return false;
+        const h = host.trim();
+        if (!isLanHost(h) || !Number.isInteger(port) || port < 1 || port > 65535) {
+          dlog('pair', `setAddress: rejected ${h}:${port}`);
+          return false;
+        }
+        const next = { ...pairing, host: h, port };
+        await savePairing(next);
+        dlog('pair', `setAddress: ${pairing.host}:${pairing.port} → ${h}:${port}`);
+        setPairing(next); // re-runs screens' pairing-keyed effects → reconnect
         return true;
       },
     }),
