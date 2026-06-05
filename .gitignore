@@ -39,5 +39,8 @@ eas.json
 # typescript
 *.tsbuildinfo
 
+# test coverage
+coverage/
+
 # Local build artifacts
 build/

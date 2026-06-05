@@ -1,0 +1,42 @@
+name: mobile-ci
+
+# Layers 1–3 of the test pyramid: typecheck + lint + jest (unit / contract /
+# component). All run on a plain Node runner — no simulator, no device, no
+# Odysseus server — so the loop is fast and deterministic. Device-only checks
+# (camera QR scan, real-LAN pairing) stay manual; an E2E (Maestro) job can be
+# added later as a separate workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the older in-flight run.
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # SDK 56 requires Node >= 20.19.4.
+          node-version: '20.19.4'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (with coverage)
+        run: npm run test:ci
