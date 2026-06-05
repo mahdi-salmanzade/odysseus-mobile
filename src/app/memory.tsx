@@ -16,7 +16,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   addMemory,
@@ -157,7 +159,7 @@ export default function MemoryScreen() {
           <Pressable
             hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
             onPress={() => setComposing((v) => !v)}
-            style={styles.addBtn}
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
             accessibilityRole="button"
             accessibilityLabel={composing ? 'Close composer' : 'New memory'}
           >
@@ -173,7 +175,7 @@ export default function MemoryScreen() {
       >
         {composing && (
           <View style={styles.composer}>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.composerInput}
               placeholder="Something to remember…"
               placeholderTextColor={theme.color.textFaint}
@@ -187,7 +189,11 @@ export default function MemoryScreen() {
                 <Pressable
                   key={c}
                   onPress={() => setCategory(c)}
-                  style={[styles.catChip, category === c && styles.catChipOn]}
+                  style={({ pressed }) => [
+                    styles.catChip,
+                    category === c && styles.catChipOn,
+                    pressed && { opacity: 0.6 },
+                  ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: category === c }}
                 >
@@ -200,7 +206,11 @@ export default function MemoryScreen() {
             <Pressable
               onPress={save}
               disabled={!draft.trim() || saving}
-              style={[styles.saveBtn, (!draft.trim() || saving) && styles.saveBtnOff]}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                (!draft.trim() || saving) && styles.saveBtnOff,
+                pressed && draft.trim() && !saving && { opacity: 0.85 },
+              ]}
               accessibilityRole="button"
             >
               {saving ? (
@@ -213,7 +223,7 @@ export default function MemoryScreen() {
         )}
 
         <View style={styles.searchWrap}>
-          <TextInput
+          <TextInput keyboardAppearance="dark"
             style={styles.search}
             placeholder="Search memories"
             placeholderTextColor={theme.color.textFaint}
@@ -227,13 +237,14 @@ export default function MemoryScreen() {
         </View>
 
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={theme.color.accent} />
-          </View>
+          <SkeletonList />
         ) : error ? (
           <View style={styles.center}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retry} onPress={() => load('initial')}>
+            <Pressable
+              style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+              onPress={() => load('initial')}
+            >
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           </View>
@@ -251,10 +262,16 @@ export default function MemoryScreen() {
               />
             }
             ListEmptyComponent={
-              <View style={styles.center}>
-                <Text style={styles.emptyText}>
+              <View style={[styles.center, styles.empty]}>
+                {query.trim() ? null : (
+                  <NavIcon name="memory" size={40} color={theme.color.textFaint} />
+                )}
+                <Text style={styles.emptyTitle}>
                   {query.trim() ? 'No matching memories' : 'No memories yet'}
                 </Text>
+                {query.trim() ? null : (
+                  <Text style={styles.emptyHint}>Tap + to save something worth remembering.</Text>
+                )}
               </View>
             }
             renderItem={({ item }) => <MemoryCard memory={item} onDelete={() => remove(item)} />}
@@ -267,7 +284,11 @@ export default function MemoryScreen() {
 
 function MemoryCard({ memory, onDelete }: { memory: Memory; onDelete: () => void }) {
   return (
-    <Pressable style={styles.card} onLongPress={onDelete} delayLongPress={350}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+      onLongPress={onDelete}
+      delayLongPress={350}
+    >
       <Text style={styles.cardText}>{memory.text}</Text>
       {memory.category ? (
         <View style={styles.chipRow}>
@@ -287,14 +308,14 @@ const styles = StyleSheet.create({
   addBtnText: { color: theme.color.accent, fontSize: 26, fontWeight: '300', lineHeight: 28 },
 
   composer: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 14,
+    marginHorizontal: theme.space(5),
+    marginBottom: theme.space(3),
+    padding: theme.space(4),
     backgroundColor: theme.color.surface,
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    gap: 12,
+    gap: theme.space(3),
   },
   composerInput: {
     color: theme.color.text,
@@ -302,12 +323,12 @@ const styles = StyleSheet.create({
     minHeight: 52,
     textAlignVertical: 'top',
   },
-  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space(2) },
   catChip: {
     backgroundColor: theme.color.surfaceAlt,
     borderRadius: theme.radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(1.5),
     borderWidth: 1,
     borderColor: theme.color.border,
   },
@@ -317,55 +338,62 @@ const styles = StyleSheet.create({
   saveBtn: {
     backgroundColor: theme.color.accent,
     borderRadius: theme.radius.md,
-    paddingVertical: 11,
+    paddingVertical: theme.space(3),
     alignItems: 'center',
   },
   saveBtnOff: { opacity: 0.4 },
   saveBtnText: { color: theme.color.bg, fontSize: theme.font.body, fontWeight: '700' },
 
-  searchWrap: { paddingHorizontal: 20, paddingBottom: 12 },
+  // No paddingTop: ScreenHeader already owns the gap below its divider
+  // (marginBottom 16px), so the search field sits at the same one-gap distance
+  // as every other screen instead of being double-spaced.
+  searchWrap: { paddingHorizontal: theme.space(5), paddingTop: 0, paddingBottom: theme.space(3) },
   search: {
     backgroundColor: theme.color.surface,
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(2.5),
     color: theme.color.text,
     fontSize: theme.font.body,
   },
-  list: { padding: 20, paddingTop: 4, gap: 12, flexGrow: 1 },
+  list: { padding: theme.space(5), paddingTop: theme.space(1), gap: theme.space(3), flexGrow: 1 },
   card: {
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 10,
+    padding: theme.space(4),
+    gap: theme.space(2.5),
   },
   cardText: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
   chipRow: { flexDirection: 'row' },
   chip: {
     backgroundColor: theme.color.surfaceAlt,
     borderRadius: theme.radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: theme.space(2.5),
+    paddingVertical: theme.space(1),
   },
+  // A passive category tag, not an action — quiet neutral, so the accent stays
+  // reserved for live actions (The One Ember Rule).
   chipText: {
-    color: theme.color.accent,
+    color: theme.color.textDim,
     fontSize: theme.font.small,
     fontWeight: '600',
   },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 14 },
-  emptyText: { color: theme.color.textFaint, fontSize: theme.font.body },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2) },
+  empty: { gap: theme.space(3) },
+  emptyTitle: { color: theme.color.textDim, fontSize: theme.font.body, fontWeight: '600' },
+  emptyHint: { color: theme.color.textFaint, fontSize: theme.font.small, textAlign: 'center', lineHeight: 19 },
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
     backgroundColor: theme.color.surface,
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
   },
   retryText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
 });

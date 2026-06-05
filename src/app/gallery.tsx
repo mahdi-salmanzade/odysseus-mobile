@@ -11,7 +11,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -23,10 +22,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonGrid } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import { ApiError, imageSource, listGalleryImages, type GalleryImageItem } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -100,13 +101,14 @@ export default function GalleryScreen() {
       <ScreenHeader title="Gallery" onMenu={openSidebar} />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonGrid columns={COLUMNS} gap={GAP} />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -126,6 +128,7 @@ export default function GalleryScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="gallery" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No images</Text>
               <Text style={styles.emptyHint}>
                 Images you generate or upload on your Odysseus server will appear here.
@@ -133,7 +136,14 @@ export default function GalleryScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <Thumbnail item={item} size={tileSize} onOpen={() => setOpen(item)} />
+            <Thumbnail
+              item={item}
+              size={tileSize}
+              onOpen={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setOpen(item);
+              }}
+            />
           )}
         />
       )}
@@ -169,7 +179,7 @@ function Thumbnail({
   const label = item.prompt ? `Image: ${item.prompt}` : 'Image';
   return (
     <Pressable
-      style={[styles.tile, { width: size, height: size }]}
+      style={({ pressed }) => [styles.tile, { width: size, height: size }, pressed && { opacity: 0.7 }]}
       onPress={onOpen}
       accessibilityRole="imagebutton"
       accessibilityLabel={label}
@@ -213,7 +223,7 @@ function Viewer({ item, onClose }: { item: GalleryImageItem; onClose: () => void
         <Pressable
           onPress={onClose}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-          style={styles.viewerBarSlot}
+          style={({ pressed }) => [styles.viewerBarSlot, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
           accessibilityLabel="Close image"
         >
@@ -253,16 +263,16 @@ function Viewer({ item, onClose }: { item: GalleryImageItem; onClose: () => void
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  grid: { paddingBottom: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  grid: { paddingBottom: theme.space(4) },
   row: { gap: GAP, marginBottom: GAP },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -278,10 +288,11 @@ const styles = StyleSheet.create({
   broken: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.surface },
   tileStar: {
     position: 'absolute',
-    top: 4,
-    right: 6,
+    top: theme.space(1),
+    right: theme.space(1.5),
     color: theme.color.accent,
     fontSize: 16,
+    // Legibility over arbitrary photo content, not surface separation.
     textShadowColor: theme.color.onAccent,
     textShadowRadius: 3,
   },
@@ -295,12 +306,12 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space(3),
   },
   viewerBarSlot: { minWidth: 44, height: 28, alignItems: 'flex-end', justifyContent: 'center' },
-  viewerStar: { color: theme.color.accent, fontSize: 20 },
+  viewerStar: { color: theme.color.accent, fontSize: theme.font.title },
   closeText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
 
   viewerImageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
-  viewerBroken: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  viewerBroken: { alignItems: 'center', justifyContent: 'center', gap: theme.space(3), padding: theme.space(8) },
 
   viewerMeta: {
     color: theme.color.textFaint,

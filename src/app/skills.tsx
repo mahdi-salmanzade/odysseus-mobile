@@ -23,7 +23,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Markdown from '@/components/markdown';
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import { ApiError, getSkillMarkdown, listSkills, type Skill } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -111,13 +113,14 @@ export default function SkillsScreen() {
       <ScreenHeader title="Skills" onMenu={openSidebar} />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -135,6 +138,7 @@ export default function SkillsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="skills" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No skills</Text>
               <Text style={styles.emptyHint}>
                 Skills you teach Odysseus on the server will appear here.
@@ -190,7 +194,7 @@ function SkillCard({
 }) {
   return (
     <Pressable
-      style={styles.card}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
       onPress={onOpen}
       onLongPress={onCopy}
       delayLongPress={350}
@@ -219,15 +223,15 @@ function SkillCard({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  list: { padding: 16, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  list: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(4), gap: theme.space(3) },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -243,18 +247,18 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 6,
+    padding: theme.space(4),
+    gap: theme.space(1.5),
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },
   cardTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700', flexShrink: 1 },
   pill: {
     color: theme.color.textDim,
     fontSize: theme.font.small,
     fontWeight: '600',
     letterSpacing: 0.3,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: theme.space(2),
+    paddingVertical: theme.space(0.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -263,5 +267,5 @@ const styles = StyleSheet.create({
   },
   description: { color: theme.color.textDim, fontSize: theme.font.small, lineHeight: 19 },
 
-  detailBody: { padding: 16 },
+  detailBody: { padding: theme.space(4) },
 });

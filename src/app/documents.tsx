@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,7 +25,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Markdown from '@/components/markdown';
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
@@ -131,13 +134,14 @@ export default function DocumentsScreen() {
       <ScreenHeader title="Documents" onMenu={openSidebar} />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -155,6 +159,7 @@ export default function DocumentsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="documents" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No documents</Text>
               <Text style={styles.emptyHint}>
                 Documents in your Odysseus RAG library will appear here.
@@ -186,6 +191,7 @@ export default function DocumentsScreen() {
                 <Pressable
                   hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
                   onPress={() => copyBody(detail.content)}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
                   accessibilityRole="button"
                   accessibilityLabel="Copy document"
                 >
@@ -233,7 +239,7 @@ function DocumentCard({
   const meta = [doc.language ?? undefined, date || undefined].filter(Boolean).join(' · ');
   return (
     <Pressable
-      style={styles.card}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
       onPress={onOpen}
       onLongPress={onCopy}
       delayLongPress={350}
@@ -256,15 +262,15 @@ function DocumentCard({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  list: { padding: 16, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  list: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(4), gap: theme.space(3) },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -280,8 +286,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 6,
+    padding: theme.space(4),
+    gap: theme.space(1.5),
   },
   cardTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700' },
   meta: {
@@ -293,10 +299,10 @@ const styles = StyleSheet.create({
   snippet: { color: theme.color.textDim, fontSize: theme.font.small, lineHeight: 19 },
 
   copyText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
-  detailBody: { padding: 16 },
+  detailBody: { padding: theme.space(4) },
   code: {
     color: theme.color.textDim,
-    fontFamily: 'Courier',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: theme.font.mono,
     lineHeight: 19,
   },

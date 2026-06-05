@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,7 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import { ApiError, listTasks, type Task } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -60,13 +61,14 @@ export default function TasksScreen() {
       <ScreenHeader title="Tasks" onMenu={openSidebar} />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -84,6 +86,7 @@ export default function TasksScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="tasks" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No scheduled tasks</Text>
               <Text style={styles.emptyHint}>
                 Tasks you schedule on your Odysseus server will appear here.
@@ -136,15 +139,15 @@ function TaskRow({ task }: { task: Task }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  list: { padding: 16, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  list: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(4), gap: theme.space(3) },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -160,15 +163,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 12,
+    padding: theme.space(4),
+    gap: theme.space(3),
   },
-  cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: theme.space(3) },
   name: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '600', flexShrink: 1 },
 
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: theme.space(2.5),
+    paddingVertical: theme.space(1),
     borderRadius: theme.radius.pill,
     borderWidth: 1,
   },
@@ -178,7 +181,7 @@ const styles = StyleSheet.create({
   pillTextOn: { color: theme.color.ok },
   pillTextOff: { color: theme.color.textFaint },
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space(3) },
   metaLabel: {
     color: theme.color.textFaint,
     fontSize: theme.font.small,
