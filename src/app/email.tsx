@@ -29,7 +29,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
@@ -53,7 +55,7 @@ function dateOnly(date: string | null): string {
 /** A 502 means the mailbox (IMAP/SMTP) is unreachable — phrase that for humans. */
 function friendlyError(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {
-    if (e.status === 502) return 'Mailbox unreachable — try again';
+    if (e.status === 502) return 'Mailbox unreachable. Try again.';
     return e.message;
   }
   return fallback;
@@ -244,7 +246,7 @@ export default function EmailScreen() {
             <Pressable
               hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
               onPress={() => setComposing(true)}
-              style={styles.addBtn}
+              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
               accessibilityLabel="Compose message"
             >
@@ -267,7 +269,7 @@ export default function EmailScreen() {
                 <Pressable
                   key={a.id}
                   onPress={() => switchAccount(a.id)}
-                  style={[styles.chip, active && styles.chipOn]}
+                  style={({ pressed }) => [styles.chip, active && styles.chipOn, pressed && { opacity: 0.6 }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={`Account ${a.name || a.from_address}`}
@@ -283,18 +285,20 @@ export default function EmailScreen() {
       )}
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => loadAccounts()}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => loadAccounts()}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
       ) : noAccounts ? (
         <View style={styles.center}>
+          <NavIcon name="email" size={40} color={theme.color.textFaint} />
           <Text style={styles.emptyTitle}>No email accounts</Text>
           <Text style={styles.emptyHint}>
             Mail accounts are configured on your Odysseus server. Once added, they appear here.
@@ -314,6 +318,7 @@ export default function EmailScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="email" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>Inbox empty</Text>
               <Text style={styles.emptyHint}>No messages in this folder.</Text>
             </View>
@@ -345,7 +350,7 @@ export default function EmailScreen() {
             <View style={styles.center}>
               <Text style={styles.errorText}>{detailError}</Text>
               <Pressable
-                style={styles.retry}
+                style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
                 onPress={() => openUid && openMessage({ uid: openUid } as EmailHeader)}
               >
                 <Text style={styles.retryText}>Try again</Text>
@@ -393,6 +398,7 @@ export default function EmailScreen() {
                 hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
                 onPress={send}
                 disabled={!to.trim() || sending}
+                style={({ pressed }) => pressed && !(!to.trim() || sending) ? { opacity: 0.6 } : undefined}
                 accessibilityRole="button"
                 accessibilityLabel="Send message"
               >
@@ -410,7 +416,7 @@ export default function EmailScreen() {
             keyboardVerticalOffset={8}
           >
             <ScrollView contentContainerStyle={styles.composeBody} keyboardShouldPersistTaps="handled">
-              <TextInput
+              <TextInput keyboardAppearance="dark"
                 style={styles.field}
                 placeholder="To (comma-separated)"
                 placeholderTextColor={theme.color.textFaint}
@@ -421,7 +427,7 @@ export default function EmailScreen() {
                 keyboardType="email-address"
                 accessibilityLabel="Recipients"
               />
-              <TextInput
+              <TextInput keyboardAppearance="dark"
                 style={styles.field}
                 placeholder="Subject"
                 placeholderTextColor={theme.color.textFaint}
@@ -429,7 +435,7 @@ export default function EmailScreen() {
                 onChangeText={setSubject}
                 accessibilityLabel="Subject"
               />
-              <TextInput
+              <TextInput keyboardAppearance="dark"
                 style={[styles.field, styles.bodyField]}
                 placeholder="Message…"
                 placeholderTextColor={theme.color.textFaint}
@@ -460,7 +466,7 @@ function MessageRow({
   const date = dateOnly(header.date);
   return (
     <Pressable
-      style={styles.row}
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
       onPress={onOpen}
       onLongPress={onCopy}
       delayLongPress={350}
@@ -488,29 +494,41 @@ const styles = StyleSheet.create({
   addBtnText: { color: theme.color.accent, fontSize: 26, fontWeight: '300', lineHeight: 26 },
 
   switcher: { borderBottomWidth: 1, borderBottomColor: theme.color.border },
-  switcherRow: { padding: theme.space(3), gap: theme.space(2) },
+  switcherRow: {
+    paddingTop: 0,
+    paddingHorizontal: theme.space(3),
+    paddingBottom: theme.space(3),
+    gap: theme.space(2),
+  },
   chip: {
     backgroundColor: theme.color.surfaceAlt,
     borderRadius: theme.radius.pill,
-    paddingHorizontal: 14,
+    paddingHorizontal: theme.space(3.5),
     paddingVertical: 7,
     borderWidth: 1,
     borderColor: theme.color.border,
     maxWidth: 200,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   chipOn: { backgroundColor: theme.color.accentDim, borderColor: theme.color.accent },
   chipText: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
   chipTextOn: { color: theme.color.text },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  list: { padding: 16, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  list: {
+    paddingTop: 0,
+    paddingHorizontal: theme.space(4),
+    paddingBottom: theme.space(4),
+    gap: theme.space(3),
+  },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center', lineHeight: 21 },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -526,33 +544,33 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 6,
+    padding: theme.space(4),
+    gap: theme.space(1.5),
   },
-  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space(2.5) },
   from: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700', flexShrink: 1 },
   date: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600' },
   subject: { color: theme.color.textDim, fontSize: theme.font.small, lineHeight: 19 },
 
-  detailBody: { padding: 16, gap: 12 },
+  detailBody: { padding: theme.space(4), gap: theme.space(3) },
   readSubject: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700', lineHeight: 26 },
   readMeta: {
     gap: 3,
-    paddingBottom: 12,
+    paddingBottom: theme.space(3),
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
   },
   readMetaLine: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 18 },
   readText: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 22 },
 
-  composeBody: { padding: 16, gap: 12 },
+  composeBody: { padding: theme.space(4), gap: theme.space(3) },
   field: {
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(3),
     color: theme.color.text,
     fontSize: theme.font.body,
   },

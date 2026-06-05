@@ -108,8 +108,8 @@ export default function PairScreen() {
               <>
                 The mobile pairing endpoints live in{' '}
                 <Text style={styles.mono}>companion/</Text>. Keep{' '}
-                <Text style={styles.mono}>AUTH_ENABLED=true</Text> — the bridge is exposed
-                on your local network.
+                <Text style={styles.mono}>AUTH_ENABLED=true</Text>, since the bridge is
+                exposed on your local network.
               </>
             }
           />
@@ -137,7 +137,7 @@ export default function PairScreen() {
           />
 
           <Pressable
-            style={styles.linkRow}
+            style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
             onPress={() => Linking.openURL(ODYSSEUS_REPO)}
             accessibilityRole="link"
           >
@@ -146,7 +146,10 @@ export default function PairScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable style={styles.primary} onPress={() => setShowPairing(true)}>
+          <Pressable
+            style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}
+            onPress={() => setShowPairing(true)}
+          >
             <Text style={styles.primaryText}>Scan QR or enter manually</Text>
           </Pressable>
         </View>
@@ -161,6 +164,7 @@ export default function PairScreen() {
           <Pressable
             hitSlop={12}
             onPress={() => setShowPairing(false)}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
@@ -200,7 +204,11 @@ export default function PairScreen() {
             <Field label="Port" value={port} onChangeText={setPort} placeholder="7000" keyboardType="number-pad" />
             <Field label="Token" value={token} onChangeText={setToken} placeholder="ody_…" autoCapitalize="none" secureTextEntry />
             <Pressable
-              style={[styles.primary, busy && styles.primaryDisabled]}
+              style={({ pressed }) => [
+                styles.primary,
+                busy && styles.primaryDisabled,
+                pressed && !busy && { opacity: 0.85 },
+              ]}
               disabled={busy}
               onPress={() => tryPair(manualPairing(host, port, token))}
             >
@@ -248,7 +256,7 @@ function CodeBlock({ lines }: { lines: string[] }) {
 function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable
-      style={[styles.tab, active && styles.tabActive]}
+      style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && { opacity: 0.6 }]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -263,7 +271,7 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor={theme.color.textFaint} {...rest} />
+      <TextInput keyboardAppearance="dark" style={styles.input} placeholderTextColor={theme.color.textFaint} {...rest} />
     </View>
   );
 }
@@ -271,15 +279,15 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
   fill: { flex: 1 },
-  header: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 16, gap: 8 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header: { paddingHorizontal: theme.space(6), paddingTop: theme.space(3), paddingBottom: theme.space(4), gap: theme.space(2) },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2.5) },
   title: { color: theme.color.accent, fontSize: 26, fontWeight: '700' },
   subtitle: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 21 },
   bold: { color: theme.color.text, fontWeight: '700' },
   back: { color: theme.color.accent, fontSize: 30, fontWeight: '400', marginRight: 2, marginTop: -4 },
   mono: { color: theme.color.accent, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  introScroll: { padding: 24, gap: 18 },
-  step: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  introScroll: { padding: theme.space(6), gap: theme.space(4.5) },
+  step: { flexDirection: 'row', gap: theme.space(3.5), alignItems: 'flex-start' },
   stepBadge: {
     width: 26,
     height: 26,
@@ -298,10 +306,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginLeft: 40,
-    gap: 2,
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(3),
+    marginLeft: theme.space(10),
+    gap: theme.space(0.5),
   },
   codeLine: {
     color: theme.color.text,
@@ -309,34 +317,34 @@ const styles = StyleSheet.create({
     fontSize: theme.font.mono,
     lineHeight: 19,
   },
-  linkRow: { paddingVertical: 4 },
+  linkRow: { paddingVertical: theme.space(2.5), minHeight: 44, justifyContent: 'center' },
   linkText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
-  footer: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12, borderTopWidth: 1, borderTopColor: theme.color.border },
-  tabs: { flexDirection: 'row', marginHorizontal: 24, backgroundColor: theme.color.surface, borderRadius: theme.radius.md, padding: 4, gap: 4 },
-  tab: { flex: 1, paddingVertical: 10, borderRadius: theme.radius.sm, alignItems: 'center' },
+  footer: { paddingHorizontal: theme.space(6), paddingTop: theme.space(3), paddingBottom: theme.space(3), borderTopWidth: 1, borderTopColor: theme.color.border },
+  tabs: { flexDirection: 'row', marginHorizontal: theme.space(6), backgroundColor: theme.color.surface, borderRadius: theme.radius.md, padding: theme.space(1), gap: theme.space(1) },
+  tab: { flex: 1, paddingVertical: theme.space(2.5), borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   tabActive: { backgroundColor: theme.color.surfaceAlt },
   tabText: { color: theme.color.textFaint, fontWeight: '600', fontSize: theme.font.small },
   tabTextActive: { color: theme.color.text },
-  scanWrap: { flex: 1, margin: 24, borderRadius: theme.radius.lg, overflow: 'hidden', backgroundColor: theme.color.bg },
-  scanBusy: { justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: theme.color.scrim },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  scanWrap: { flex: 1, margin: theme.space(6), borderRadius: theme.radius.lg, overflow: 'hidden', backgroundColor: theme.color.bg },
+  scanBusy: { justifyContent: 'center', alignItems: 'center', gap: theme.space(3), backgroundColor: theme.color.scrim },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: theme.space(3) },
   dim: { color: theme.color.textDim },
-  form: { padding: 24, gap: 18 },
-  fieldWrap: { gap: 6 },
+  form: { padding: theme.space(6), gap: theme.space(4.5) },
+  fieldWrap: { gap: theme.space(1.5) },
   fieldLabel: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
   input: {
     backgroundColor: theme.color.surface,
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(3),
     color: theme.color.text,
     fontSize: theme.font.body,
   },
-  primary: { backgroundColor: theme.color.accent, borderRadius: theme.radius.md, paddingVertical: 15, alignItems: 'center', marginTop: 6 },
+  primary: { backgroundColor: theme.color.accent, borderRadius: theme.radius.md, paddingVertical: 15, alignItems: 'center', marginTop: theme.space(1.5) },
   primaryDisabled: { opacity: 0.6 },
   primaryText: { color: theme.color.onAccent, fontWeight: '700', fontSize: theme.font.body },
-  errorBar: { margin: 24, marginTop: 0, backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, padding: 14 },
+  errorBar: { margin: theme.space(6), marginTop: 0, backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, padding: theme.space(3.5) },
   errorText: { color: theme.color.danger, fontSize: theme.font.small },
 });

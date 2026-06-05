@@ -28,7 +28,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
@@ -234,7 +236,7 @@ export default function CalendarScreen() {
           <Pressable
             hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
             onPress={() => setComposing(true)}
-            style={styles.addBtn}
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
             accessibilityRole="button"
             accessibilityLabel="Add event"
           >
@@ -244,13 +246,14 @@ export default function CalendarScreen() {
       />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-        </View>
+        <SkeletonList />
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -268,6 +271,7 @@ export default function CalendarScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="calendar" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No upcoming events</Text>
               <Text style={styles.emptyHint}>
                 Events in the next {WINDOW_DAYS} days will appear here.
@@ -318,7 +322,7 @@ function EventRow({
   const meta = [event.location, calendarName].filter(Boolean).join(' · ');
   return (
     <Pressable
-      style={styles.eventRow}
+      style={({ pressed }) => [styles.eventRow, pressed && { opacity: 0.7 }]}
       onLongPress={onDelete}
       delayLongPress={350}
       accessibilityRole="button"
@@ -326,7 +330,7 @@ function EventRow({
     >
       <View style={styles.eventLead}>
         <View style={[styles.dot, { backgroundColor: color ?? theme.color.textFaint }]} />
-        <Text style={styles.eventTime}>{time || '—'}</Text>
+        <Text style={styles.eventTime}>{time || '·'}</Text>
       </View>
       <View style={styles.eventBody}>
         <Text style={styles.eventTitle} numberOfLines={2}>
@@ -469,7 +473,7 @@ function ComposeModal({
 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
             <Text style={styles.fieldLabel}>Summary</Text>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.input}
               placeholder="Event title"
               placeholderTextColor={theme.color.textFaint}
@@ -490,7 +494,11 @@ function ComposeModal({
                   return (
                     <Pressable
                       key={c.id}
-                      style={[styles.calChip, selected && styles.calChipOn]}
+                      style={({ pressed }) => [
+                        styles.calChip,
+                        selected && styles.calChipOn,
+                        pressed && { opacity: 0.6 },
+                      ]}
                       onPress={() => setCalendarId(c.id)}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
@@ -518,7 +526,7 @@ function ComposeModal({
             </View>
 
             <Text style={styles.fieldLabel}>Start</Text>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.input}
               placeholder="YYYY-MM-DDTHH:MM"
               placeholderTextColor={theme.color.textFaint}
@@ -530,7 +538,7 @@ function ComposeModal({
             />
 
             <Text style={styles.fieldLabel}>End</Text>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.input}
               placeholder="YYYY-MM-DDTHH:MM"
               placeholderTextColor={theme.color.textFaint}
@@ -542,7 +550,7 @@ function ComposeModal({
             />
 
             <Text style={styles.fieldLabel}>Location</Text>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.input}
               placeholder="Optional"
               placeholderTextColor={theme.color.textFaint}
@@ -556,7 +564,7 @@ function ComposeModal({
 
           <View style={styles.modalActions}>
             <Pressable
-              style={styles.cancelBtn}
+              style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
               onPress={close}
               accessibilityRole="button"
               accessibilityLabel="Cancel"
@@ -564,7 +572,11 @@ function ComposeModal({
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={[styles.saveBtn, !canSubmit && styles.saveBtnOff]}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                !canSubmit && styles.saveBtnOff,
+                pressed && canSubmit && { opacity: 0.85 },
+              ]}
               onPress={submit}
               disabled={!canSubmit}
               accessibilityRole="button"
@@ -589,15 +601,15 @@ const styles = StyleSheet.create({
   addBtn: { width: 24, height: 18, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: theme.color.accent, fontSize: 26, fontWeight: '300', lineHeight: 26 },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  list: { padding: 16, gap: 20 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
+  list: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(4), gap: theme.space(5) },
   emptyWrap: { flexGrow: 1 },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -608,7 +620,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: theme.color.textDim, fontSize: theme.font.body, fontWeight: '600' },
   emptyHint: { color: theme.color.textFaint, fontSize: theme.font.small, textAlign: 'center', lineHeight: 19 },
 
-  daySection: { gap: 8 },
+  daySection: { gap: theme.space(2) },
   dayHeader: {
     color: theme.color.textFaint,
     fontSize: theme.font.small,
@@ -616,7 +628,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  dayEvents: { gap: 8 },
+  dayEvents: { gap: theme.space(2) },
 
   eventRow: {
     flexDirection: 'row',
@@ -625,10 +637,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
     padding: 14,
-    gap: 12,
+    gap: theme.space(3),
   },
-  eventLead: { width: 78, gap: 6 },
-  dot: { width: 9, height: 9, borderRadius: 999 },
+  eventLead: { width: 78, gap: theme.space(1.5) },
+  dot: { width: 9, height: 9, borderRadius: theme.radius.pill },
   eventTime: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
   eventBody: { flex: 1, gap: 3 },
   eventTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '600' },
@@ -649,7 +661,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 38,
     height: 4,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     backgroundColor: theme.color.border,
     marginBottom: theme.space(3),
   },

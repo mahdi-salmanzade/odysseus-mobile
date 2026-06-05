@@ -23,8 +23,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import {
@@ -104,12 +106,17 @@ export default function AdminScreen() {
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={loadStatus} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+            onPress={loadStatus}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
       ) : status && !status.available ? (
         <View style={styles.center}>
+          <NavIcon name="admin" size={40} color={theme.color.textFaint} />
           <Text style={styles.emptyTitle}>Admin tools unavailable</Text>
           <Text style={styles.emptyHint}>
             {!status.enabled
@@ -118,7 +125,11 @@ export default function AdminScreen() {
                 ? "This paired account isn't an admin."
                 : 'These tools are not available for this account.'}
           </Text>
-          <Pressable style={styles.retry} onPress={loadStatus} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+            onPress={loadStatus}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -131,7 +142,11 @@ export default function AdminScreen() {
                 <Pressable
                   key={t.id}
                   onPress={() => setTool(t.id)}
-                  style={[styles.tab, active && styles.tabActive]}
+                  style={({ pressed }) => [
+                    styles.tab,
+                    active && styles.tabActive,
+                    pressed && !active && { opacity: 0.6 },
+                  ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={`${t.label} tool`}
@@ -182,6 +197,7 @@ function TerminalSection() {
       setError('Enter a command to run.');
       return;
     }
+    Haptics.selectionAsync().catch(() => {});
     setRunning(true);
     setError(null);
     try {
@@ -209,7 +225,7 @@ function TerminalSection() {
       keyboardVerticalOffset={8}
     >
       <View style={styles.cmdBar}>
-        <TextInput
+        <TextInput keyboardAppearance="dark"
           style={styles.cmdInput}
           placeholder="Command to run on the server…"
           placeholderTextColor={theme.color.textFaint}
@@ -224,7 +240,11 @@ function TerminalSection() {
         <Pressable
           onPress={run}
           disabled={!command.trim() || running}
-          style={[styles.runBtn, (!command.trim() || running) && styles.runBtnOff]}
+          style={({ pressed }) => [
+            styles.runBtn,
+            (!command.trim() || running) && styles.runBtnOff,
+            pressed && !!command.trim() && !running && { opacity: 0.85 },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Run command"
         >
@@ -325,7 +345,7 @@ function ContactsSection() {
   return (
     <View style={styles.flex}>
       <View style={styles.searchBar}>
-        <TextInput
+        <TextInput keyboardAppearance="dark"
           style={styles.input}
           placeholder="Search contacts…"
           placeholderTextColor={theme.color.textFaint}
@@ -340,7 +360,11 @@ function ContactsSection() {
         <Pressable
           onPress={() => load(query)}
           disabled={loading}
-          style={[styles.runBtn, loading && styles.runBtnOff]}
+          style={({ pressed }) => [
+            styles.runBtn,
+            loading && styles.runBtnOff,
+            pressed && !loading && { opacity: 0.85 },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Search contacts"
         >
@@ -355,13 +379,19 @@ function ContactsSection() {
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={() => load(query)} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+            onPress={() => load(query)}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
       ) : items.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyHint}>No contacts found.</Text>
+          <NavIcon name="admin" size={40} color={theme.color.textFaint} />
+          <Text style={styles.emptyTitle}>No contacts found</Text>
+          <Text style={styles.emptyHint}>Try a different search, or clear the box to list everyone.</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.listWrap} keyboardShouldPersistTaps="handled">
@@ -440,6 +470,7 @@ function VaultSection() {
       }
       // Never keep the password around once it's been used.
       setPassword('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await load();
     } catch (e) {
       if (cancelled.current) return;
@@ -460,7 +491,11 @@ function VaultSection() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retry} onPress={load} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+          onPress={load}
+          accessibilityRole="button"
+        >
           <Text style={styles.retryText}>Retry</Text>
         </Pressable>
       </View>
@@ -493,7 +528,7 @@ function VaultSection() {
         {status?.configured && !status.unlocked ? (
           <View style={styles.card}>
             <Text style={styles.label}>Master password</Text>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={[styles.input, styles.cardInput]}
               placeholder="Master password"
               placeholderTextColor={theme.color.textFaint}
@@ -513,7 +548,11 @@ function VaultSection() {
             <Pressable
               onPress={unlock}
               disabled={!password || unlocking}
-              style={[styles.fullBtn, (!password || unlocking) && styles.runBtnOff]}
+              style={({ pressed }) => [
+                styles.fullBtn,
+                (!password || unlocking) && styles.runBtnOff,
+                pressed && !!password && !unlocking && { opacity: 0.85 },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Unlock vault"
             >
@@ -580,7 +619,11 @@ function McpSection() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retry} onPress={load} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+          onPress={load}
+          accessibilityRole="button"
+        >
           <Text style={styles.retryText}>Retry</Text>
         </Pressable>
       </View>
@@ -589,7 +632,9 @@ function McpSection() {
   if (items.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyHint}>No MCP servers configured.</Text>
+        <NavIcon name="admin" size={40} color={theme.color.textFaint} />
+        <Text style={styles.emptyTitle}>No MCP servers</Text>
+        <Text style={styles.emptyHint}>Add an MCP server in Odysseus on the server to see it listed here.</Text>
       </View>
     );
   }
@@ -675,7 +720,11 @@ function CookbookSection() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retry} onPress={load} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+          onPress={load}
+          accessibilityRole="button"
+        >
           <Text style={styles.retryText}>Retry</Text>
         </Pressable>
       </View>
@@ -702,13 +751,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
   flex: { flex: 1 },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -724,13 +773,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space(1),
     paddingHorizontal: theme.space(4),
-    paddingVertical: theme.space(3),
+    paddingTop: 0,
+    paddingBottom: theme.space(3),
   },
   tab: {
     flex: 1,
     paddingVertical: theme.space(2),
     borderRadius: theme.radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     backgroundColor: theme.color.surface,
     borderWidth: 1,
     borderColor: theme.color.border,
@@ -783,6 +835,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space(4),
     paddingVertical: theme.space(3),
     minWidth: 76,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -845,7 +898,7 @@ const styles = StyleSheet.create({
 
   pill: {
     paddingHorizontal: theme.space(2),
-    paddingVertical: 2,
+    paddingVertical: theme.space(0.5),
     borderRadius: theme.radius.pill,
     borderWidth: 1,
   },
