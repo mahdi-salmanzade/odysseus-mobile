@@ -1,0 +1,24 @@
+# The LAN-only host guard, end-to-end through the real UI. A public host
+# (example.com) never passes manualPairing(), so the app rejects it WITHOUT any
+# network call — deterministic and server-free. This is the on-device twin of
+# the isLanHost / manualPairing unit tests.
+appId: tech.mindzone.odysseus
+---
+- clearState
+- launchApp
+- tapOn: 'Scan QR or enter manually'
+- tapOn: 'Enter manually'
+
+- tapOn:
+    id: 'pair-host'
+- inputText: 'example.com' # public FQDN — must be rejected
+- tapOn:
+    id: 'pair-token'
+- inputText: 'ody_testtoken123'
+- hideKeyboard
+
+- tapOn:
+    id: 'pair-connect'
+# manualPairing() returns null for a non-LAN host → the invalid-code error,
+# never the network error. (Apostrophe in the copy is a curly ’, so match loosely.)
+- assertVisible: '.*look like a valid Odysseus pairing code.*'

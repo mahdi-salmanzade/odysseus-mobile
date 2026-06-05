@@ -200,10 +200,11 @@ export default function PairScreen() {
       ) : (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Field label="Host / IP" value={host} onChangeText={setHost} placeholder="192.168.1.50" autoCapitalize="none" keyboardType="numbers-and-punctuation" />
-            <Field label="Port" value={port} onChangeText={setPort} placeholder="7000" keyboardType="number-pad" />
-            <Field label="Token" value={token} onChangeText={setToken} placeholder="ody_…" autoCapitalize="none" secureTextEntry />
+            <Field testID="pair-host" label="Host / IP" value={host} onChangeText={setHost} placeholder="192.168.1.50" autoCapitalize="none" keyboardType="numbers-and-punctuation" />
+            <Field testID="pair-port" label="Port" value={port} onChangeText={setPort} placeholder="7000" keyboardType="number-pad" />
+            <Field testID="pair-token" label="Token" value={token} onChangeText={setToken} placeholder="ody_…" autoCapitalize="none" secureTextEntry />
             <Pressable
+              testID="pair-connect"
               style={({ pressed }) => [
                 styles.primary,
                 busy && styles.primaryDisabled,
@@ -271,7 +272,13 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput keyboardAppearance="dark" style={styles.input} placeholderTextColor={theme.color.textFaint} {...rest} />
+      <TextInput
+        keyboardAppearance="dark"
+        style={styles.input}
+        placeholderTextColor={theme.color.textFaint}
+        accessibilityLabel={label}
+        {...rest}
+      />
     </View>
   );
 }

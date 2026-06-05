@@ -1,0 +1,13 @@
+# Smoke test: cold start on a fresh install lands on the pairing intro, and the
+# "set up" CTA opens the pair screen with both pairing modes. No server needed —
+# this just proves the app boots and the unpaired gate (Stack.Protected guard=
+# !paired in src/app/_layout.tsx) renders.
+appId: tech.mindzone.odysseus
+---
+- clearState # fresh install: no stored pairing → the pair screen is the gate
+- launchApp
+- assertVisible: 'Set up Odysseus'
+- tapOn: 'Scan QR or enter manually'
+- assertVisible: 'Pair with Odysseus'
+- assertVisible: 'Scan QR'
+- assertVisible: 'Enter manually'

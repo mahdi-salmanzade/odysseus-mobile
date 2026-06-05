@@ -1,0 +1,26 @@
+# A well-formed pairing pointed at an unreachable LAN address. The host passes
+# isLanHost (valid 10/8), so the app DOES attempt to ping it, then surfaces the
+# network error when it can't connect. Exercises the real request() error path
+# end-to-end. Still server-free: 10.255.255.1 is a valid-but-unrouted LAN IP.
+appId: tech.mindzone.odysseus
+---
+- clearState
+- launchApp
+- tapOn: 'Scan QR or enter manually'
+- tapOn: 'Enter manually'
+
+- tapOn:
+    id: 'pair-host'
+- inputText: '10.255.255.1' # valid LAN shape, but nothing is listening
+- tapOn:
+    id: 'pair-token'
+- inputText: 'ody_testtoken123'
+- hideKeyboard
+
+- tapOn:
+    id: 'pair-connect'
+# Connecting… spinner, then the unreachable-host message once the connect fails
+# or the 8s timeout fires. Wait generously so a slow simulator isn't flaky.
+- extendedWaitUntil:
+    visible: '.*[Cc]ould not reach.*|.*too long to respond.*'
+    timeout: 20000

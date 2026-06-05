@@ -1,0 +1,25 @@
+name: e2e-ios
+
+# Cloud E2E: build a simulator app with the `e2e-test` profile, then run the
+# Maestro flows against it on an EAS-hosted iOS Simulator. Triggered on PRs.
+# Requires the `e2e-test` build profile in eas.json (see TESTING.md) — eas.json
+# is gitignored here, so add it locally before enabling this workflow.
+on:
+  pull_request:
+    branches: ['main']
+
+jobs:
+  build_ios:
+    type: build
+    params:
+      platform: ios
+      profile: e2e-test
+  maestro_test:
+    needs: [build_ios]
+    type: maestro
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      flow_path:
+        - .maestro/launch.yml
+        - .maestro/manual-validation.yml
+        - .maestro/unreachable-server.yml
