@@ -14,8 +14,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MenuIcon, MicIcon, SettingsIcon } from '@/components/header-icons';
@@ -494,24 +492,9 @@ export default function ChatScreen() {
     await Clipboard.setStringAsync(content);
   }, []);
 
-  // Swipe right from the left edge to reveal the navigation drawer — the same
-  // panel the hamburger opens. activeOffsetX gates on a rightward drag, while
-  // failOffsetY yields to the chat list's vertical scroll, so the gesture only
-  // ever fires on a deliberate horizontal pull from the edge.
-  const edgeSwipe = Gesture.Pan()
-    .activeOffsetX(18)
-    .failOffsetY([-16, 16])
-    .onEnd((e) => {
-      if (e.translationX > 56 || e.velocityX > 600) runOnJS(openSidebar)();
-    });
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Invisible left-edge strip: a swipe-right here opens the drawer. */}
-      <GestureDetector gesture={edgeSwipe}>
-        <View style={styles.edgeSwipe} />
-      </GestureDetector>
-
+      {/* The open-drawer edge swipe is now a global strip in the root layout. */}
       <View style={styles.header}>
         <Pressable
           hitSlop={12}
@@ -817,9 +800,7 @@ const styles = StyleSheet.create({
     // nav exactly like every other screen.
     marginBottom: theme.space(4),
   },
-  // Thin transparent capture zone pinned to the left edge for the open-drawer
   // swipe. Sits above content but only ~22px wide; non-pan taps fall through.
-  edgeSwipe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: theme.space(5.5), zIndex: 20 },
   hamburger: { paddingRight: theme.space(0.5) },
   headerCenter: { flex: 1 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },

@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { EdgeSwipe } from '@/components/edge-swipe';
 import { Sidebar } from '@/components/sidebar';
 import { theme } from '@/constants/theme';
 import { PairingProvider, usePairing } from '@/lib/pairing-context';
@@ -31,6 +32,11 @@ function RootNavigator() {
           headerShown: false,
           contentStyle: { backgroundColor: theme.color.bg },
           animation: 'fade',
+          // The app navigates via the drawer, not a push/pop stack, so the iOS
+          // native back-swipe only ever popped you to chat by surprise — and it
+          // hijacked the left-edge open-drawer swipe on every non-index screen.
+          // Disable it app-wide; the drawer's EdgeSwipe owns the left edge now.
+          gestureEnabled: false,
         }}
       >
         <Stack.Protected guard={paired}>
@@ -50,13 +56,21 @@ function RootNavigator() {
           <Stack.Screen name="compare" />
           <Stack.Screen name="presets" />
           <Stack.Screen name="admin" />
-          <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+          {/* Modal keeps its swipe-down-to-dismiss; re-enable the gesture the
+              global default turns off. */}
+          <Stack.Screen
+            name="settings"
+            options={{ presentation: 'modal', gestureEnabled: true }}
+          />
         </Stack.Protected>
 
         <Stack.Protected guard={!paired}>
           <Stack.Screen name="pair" />
         </Stack.Protected>
       </Stack>
+
+      {/* Left-edge open-drawer gesture for every paired screen (below Sidebar). */}
+      {paired && <EdgeSwipe />}
 
       {/* Overlay above every paired screen; renders nothing while closed. */}
       {paired && <Sidebar />}
