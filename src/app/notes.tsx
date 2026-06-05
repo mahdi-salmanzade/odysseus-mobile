@@ -22,8 +22,11 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
@@ -222,7 +225,7 @@ export default function NotesScreen() {
           <Pressable
             hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
             onPress={() => setComposing((v) => !v)}
-            style={styles.addBtn}
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
             accessibilityRole="button"
             accessibilityLabel={composing ? 'Close composer' : 'New note'}
           >
@@ -238,14 +241,14 @@ export default function NotesScreen() {
       >
         {composing && (
           <View style={styles.composer}>
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.titleInput}
               placeholder="Title"
               placeholderTextColor={theme.color.textFaint}
               value={title}
               onChangeText={setTitle}
             />
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.bodyInput}
               placeholder={checklist ? 'One item per line…' : 'Note…'}
               placeholderTextColor={theme.color.textFaint}
@@ -256,7 +259,11 @@ export default function NotesScreen() {
             <View style={styles.composerActions}>
               <Pressable
                 onPress={() => setChecklist((v) => !v)}
-                style={[styles.modeChip, checklist && styles.modeChipOn]}
+                style={({ pressed }) => [
+                  styles.modeChip,
+                  checklist && styles.modeChipOn,
+                  pressed && { opacity: 0.6 },
+                ]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: checklist }}
               >
@@ -267,9 +274,10 @@ export default function NotesScreen() {
               <Pressable
                 onPress={save}
                 disabled={(!title.trim() && !body.trim()) || saving}
-                style={[
+                style={({ pressed }) => [
                   styles.saveBtn,
                   (!title.trim() && !body.trim()) || saving ? styles.saveBtnOff : null,
+                  pressed && (title.trim() || body.trim()) && !saving && { opacity: 0.85 },
                 ]}
                 accessibilityRole="button"
               >
@@ -284,13 +292,14 @@ export default function NotesScreen() {
         )}
 
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={theme.color.accent} />
-          </View>
+          <SkeletonList />
         ) : error ? (
           <View style={styles.center}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retry} onPress={() => load('initial')}>
+            <Pressable
+              style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+              onPress={() => load('initial')}
+            >
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           </View>
@@ -314,11 +323,35 @@ export default function NotesScreen() {
                 tintColor={theme.color.accent}
               />
             }
-            ListEmptyComponent={<Text style={styles.emptyText}>No notes yet</Text>}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <NavIcon name="notes" size={40} color={theme.color.textFaint} />
+                <Text style={styles.emptyTitle}>No notes yet</Text>
+                <Text style={styles.emptyHint}>Tap + to write a note or start a checklist.</Text>
+              </View>
+            }
           />
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** A pushpin, drawn in the app's line-icon family so it never reads as the
+ * checklist's ○ glyph. Filled coral when pinned, a faint outline when not. */
+function PinGlyph({ pinned }: { pinned?: boolean }) {
+  const color = pinned ? theme.color.accent : theme.color.textFaint;
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={pinned ? color : 'none'}
+      />
+    </Svg>
   );
 }
 
@@ -335,24 +368,27 @@ function NoteCard({
 }) {
   const hasItems = Array.isArray(note.items) && note.items.length > 0;
   return (
-    <Pressable style={styles.card} onLongPress={onDelete} delayLongPress={350}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+      onLongPress={onDelete}
+      delayLongPress={350}
+    >
       <View style={styles.cardHead}>
-        <Pressable
-          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-          onPress={onTogglePin}
-          accessibilityRole="button"
-          accessibilityLabel={note.pinned ? 'Unpin note' : 'Pin note'}
-          accessibilityState={{ selected: !!note.pinned }}
-        >
-          <Text style={[styles.pin, !note.pinned && styles.pinOff]}>
-            {note.pinned ? '●' : '○'}
-          </Text>
-        </Pressable>
         {!!note.title && (
           <Text style={styles.cardTitle} numberOfLines={2}>
             {note.title}
           </Text>
         )}
+        <Pressable
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+          onPress={onTogglePin}
+          style={({ pressed }) => [styles.pinBtn, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel={note.pinned ? 'Unpin note' : 'Pin note'}
+          accessibilityState={{ selected: !!note.pinned }}
+        >
+          <PinGlyph pinned={note.pinned} />
+        </Pressable>
       </View>
 
       {hasItems ? (
@@ -360,7 +396,7 @@ function NoteCard({
           {note.items!.map((it, i) => (
             <Pressable
               key={i}
-              style={styles.checkRow}
+              style={({ pressed }) => [styles.checkRow, pressed && { opacity: 0.6 }]}
               hitSlop={11}
               onPress={() => onToggleItem(i)}
               accessibilityRole="button"
@@ -445,9 +481,13 @@ const styles = StyleSheet.create({
   },
   retryText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
 
-  list: { padding: theme.space(5), gap: theme.space(3) },
+  // No top padding: the shared ScreenHeader already owns the 16px gap below the
+  // divider, so the first card sits at that one consistent gap, not double-spaced.
+  list: { paddingHorizontal: theme.space(5), paddingBottom: theme.space(5), gap: theme.space(3) },
   emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: theme.color.textFaint, fontSize: theme.font.body },
+  empty: { alignItems: 'center', gap: theme.space(3), paddingHorizontal: theme.space(8) },
+  emptyTitle: { color: theme.color.textDim, fontSize: theme.font.body, fontWeight: '600' },
+  emptyHint: { color: theme.color.textFaint, fontSize: theme.font.small, textAlign: 'center', lineHeight: 19 },
 
   card: {
     backgroundColor: theme.color.surface,
@@ -457,10 +497,13 @@ const styles = StyleSheet.create({
     padding: theme.space(4),
     gap: theme.space(2.5),
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },
-  pin: { color: theme.color.accent, fontSize: theme.font.small },
-  pinOff: { color: theme.color.textFaint },
-  cardTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700', flexShrink: 1 },
+  // Title flexes to fill; the pin sits at the trailing edge (marginLeft: auto),
+  // so a title-less note shows just a quiet pin in the corner, not a lone glyph
+  // masquerading as a broken checkbox. flex-start keeps the pin level with the
+  // first line of a wrapping title.
+  cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space(2), minHeight: 17 },
+  pinBtn: { marginLeft: 'auto' },
+  cardTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700', flex: 1 },
   content: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 21 },
   contentDim: { color: theme.color.textFaint, fontSize: theme.font.small, fontStyle: 'italic' },
 
