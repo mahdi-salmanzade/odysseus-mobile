@@ -17,9 +17,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Markdown from '@/components/markdown';
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import { ApiError, webSearch, type SearchResult } from '@/lib/api';
@@ -49,6 +51,7 @@ export default function SearchScreen() {
     if (!pairing || loading) return;
     const q = query.trim();
     if (!q) return;
+    Haptics.selectionAsync().catch(() => {});
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +83,7 @@ export default function SearchScreen() {
         keyboardVerticalOffset={8}
       >
         <View style={styles.searchBar}>
-          <TextInput
+          <TextInput keyboardAppearance="dark"
             style={styles.input}
             placeholder="Search the web…"
             placeholderTextColor={theme.color.textFaint}
@@ -94,7 +97,11 @@ export default function SearchScreen() {
           <Pressable
             onPress={run}
             disabled={!query.trim() || loading}
-            style={[styles.searchBtn, (!query.trim() || loading) && styles.searchBtnOff]}
+            style={({ pressed }) => [
+              styles.searchBtn,
+              (!query.trim() || loading) && styles.searchBtnOff,
+              pressed && query.trim() && !loading && { opacity: 0.85 },
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Run search"
           >
@@ -114,7 +121,7 @@ export default function SearchScreen() {
           <View style={styles.center}>
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
-              style={styles.retry}
+              style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
               onPress={run}
               accessibilityRole="button"
               accessibilityLabel="Retry search"
@@ -141,7 +148,7 @@ export default function SearchScreen() {
                 {result.sources.map((s, i) => (
                   <Pressable
                     key={`${s.url}-${i}`}
-                    style={styles.sourceRow}
+                    style={({ pressed }) => [styles.sourceRow, pressed && { opacity: 0.7 }]}
                     onPress={() => openExternal(s.url)}
                     accessibilityRole="link"
                     accessibilityLabel={`Open source: ${s.title || s.url}`}
@@ -161,6 +168,7 @@ export default function SearchScreen() {
           </ScrollView>
         ) : (
           <View style={styles.center}>
+            <NavIcon name="search" size={40} color={theme.color.textFaint} />
             <Text style={styles.emptyTitle}>Search the web</Text>
             <Text style={styles.emptyHint}>
               Run a web search on your Odysseus server and see the summary and sources here.
@@ -176,12 +184,14 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
   flex: { flex: 1 },
 
+  // The header owns the gap below its hairline (marginBottom), so the bar needs
+  // no top padding of its own — only the bottom gap before the results.
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space(2),
     paddingHorizontal: theme.space(4),
-    paddingVertical: theme.space(3),
+    paddingBottom: theme.space(3),
   },
   input: {
     flex: 1,
@@ -206,13 +216,13 @@ const styles = StyleSheet.create({
   searchBtnOff: { opacity: 0.4 },
   searchBtnText: { color: theme.color.onAccent, fontSize: theme.font.body, fontWeight: '700' },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: theme.space(1),
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -235,7 +245,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.border,
     borderRadius: theme.radius.sm,
     padding: theme.space(3),
-    gap: 2,
+    gap: theme.space(0.5),
   },
   sourceTitle: { color: theme.color.text, fontSize: theme.font.small, fontWeight: '600' },
   sourceUrl: { color: theme.color.accent, fontSize: theme.font.small },

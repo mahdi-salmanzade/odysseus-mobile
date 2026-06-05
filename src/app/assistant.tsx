@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import { ApiError, getAssistant, updateAssistant, type Assistant } from '@/lib/api';
@@ -143,7 +144,7 @@ export default function AssistantScreen() {
             hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
             onPress={save}
             disabled={saveDisabled}
-            style={styles.saveSlot}
+            style={({ pressed }) => [styles.saveSlot, pressed && !saveDisabled && { opacity: 0.6 }]}
             accessibilityRole="button"
             accessibilityLabel="Save assistant"
             accessibilityState={{ disabled: saveDisabled }}
@@ -164,7 +165,11 @@ export default function AssistantScreen() {
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retry} onPress={load} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+            onPress={load}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
@@ -181,6 +186,7 @@ export default function AssistantScreen() {
           >
             {!exists && (
               <View style={styles.intro}>
+                <NavIcon name="assistant" size={40} color={theme.color.textFaint} />
                 <Text style={styles.introTitle}>Set up your assistant</Text>
                 <Text style={styles.introHint}>
                   Give your assistant a name, a personality, and tell it what to call you. Saving
@@ -229,7 +235,7 @@ export default function AssistantScreen() {
               label="Model"
               value={form.model}
               onChangeText={(v) => set('model', v)}
-              placeholder="Optional — leave blank for the server default"
+              placeholder="Optional, leave blank for the server default"
               accessibilityLabel="Model"
               autoCapitalize="none"
               autoCorrect={false}
@@ -239,7 +245,7 @@ export default function AssistantScreen() {
               label="Timezone"
               value={form.timezone}
               onChangeText={(v) => set('timezone', v)}
-              placeholder="Optional — e.g. America/New_York"
+              placeholder="Optional, e.g. America/New_York"
               accessibilityLabel="Timezone"
               autoCapitalize="none"
               autoCorrect={false}
@@ -251,7 +257,11 @@ export default function AssistantScreen() {
             <Pressable
               onPress={save}
               disabled={saveDisabled}
-              style={[styles.saveBtn, saveDisabled && styles.saveBtnOff]}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                saveDisabled && styles.saveBtnOff,
+                pressed && !saveDisabled && { opacity: 0.85 },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Save assistant"
               accessibilityState={{ disabled: saveDisabled }}
@@ -293,7 +303,7 @@ function FormField({
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
+      <TextInput keyboardAppearance="dark"
         style={[styles.input, multiline && styles.inputMultiline, minHeight ? { minHeight } : null]}
         value={value}
         onChangeText={onChangeText}
@@ -316,11 +326,11 @@ const styles = StyleSheet.create({
   saveText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '700' },
   saveTextOff: { color: theme.color.textFaint },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(3) },
   errorText: { color: theme.color.danger, fontSize: theme.font.body, textAlign: 'center' },
   retry: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: theme.space(5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
@@ -328,20 +338,25 @@ const styles = StyleSheet.create({
   },
   retryText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
 
-  body: { padding: 20, gap: 18 },
+  body: {
+    paddingHorizontal: theme.space(5),
+    paddingBottom: theme.space(5),
+    gap: theme.space(4.5),
+  },
 
   intro: {
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: 16,
-    gap: 6,
+    padding: theme.space(5),
+    alignItems: 'center',
+    gap: theme.space(2),
   },
   introTitle: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '700' },
-  introHint: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19 },
+  introHint: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19, textAlign: 'center' },
 
-  fieldWrap: { gap: 8 },
+  fieldWrap: { gap: theme.space(2) },
   fieldLabel: {
     color: theme.color.textFaint,
     fontSize: theme.font.small,
@@ -354,8 +369,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(3),
     color: theme.color.text,
     fontSize: theme.font.body,
   },

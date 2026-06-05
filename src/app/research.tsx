@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Markdown from '@/components/markdown';
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import {
@@ -222,11 +223,14 @@ export default function ResearchScreen() {
       >
         {phase === 'compose' && (
           <ScrollView contentContainerStyle={styles.composeWrap} keyboardShouldPersistTaps="handled">
-            <Text style={styles.lead}>
-              Kick off a deep research run on your Odysseus. It searches the web across
-              multiple rounds — this takes a minute or two. You can leave; it keeps going.
-            </Text>
-            <TextInput
+            <View style={styles.leadHead}>
+              <NavIcon name="research" size={40} color={theme.color.textFaint} />
+              <Text style={styles.lead}>
+                Kick off a deep research run on your Odysseus. It searches the web across
+                multiple rounds, which takes a minute or two. You can leave; it keeps going.
+              </Text>
+            </View>
+            <TextInput keyboardAppearance="dark"
               style={styles.queryInput}
               placeholder="What do you want researched?"
               placeholderTextColor={theme.color.textFaint}
@@ -239,7 +243,11 @@ export default function ResearchScreen() {
             <Pressable
               onPress={launch}
               disabled={!query.trim() || starting}
-              style={[styles.primaryBtn, (!query.trim() || starting) && styles.primaryBtnOff]}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                (!query.trim() || starting) && styles.primaryBtnOff,
+                pressed && query.trim() && !starting && { opacity: 0.85 },
+              ]}
             >
               {starting ? (
                 <ActivityIndicator color={theme.color.bg} />
@@ -275,7 +283,7 @@ export default function ResearchScreen() {
             <Pressable
               onPress={onCancel}
               disabled={cancelling}
-              style={styles.cancelBtn}
+              style={({ pressed }) => [styles.cancelBtn, pressed && !cancelling && { opacity: 0.6 }]}
               accessibilityRole="button"
               accessibilityLabel="Cancel research"
             >
@@ -295,7 +303,7 @@ export default function ResearchScreen() {
                 {result.sources.map((s, i) => (
                   <Pressable
                     key={`${s.url}-${i}`}
-                    style={styles.sourceRow}
+                    style={({ pressed }) => [styles.sourceRow, pressed && { opacity: 0.7 }]}
                     onPress={() => s.url && Linking.openURL(s.url).catch(() => {})}
                     accessibilityRole="link"
                     accessibilityLabel={`Open source: ${s.title || s.url}`}
@@ -312,7 +320,10 @@ export default function ResearchScreen() {
                 ))}
               </View>
             )}
-            <Pressable onPress={reset} style={[styles.primaryBtn, styles.newBtn]}>
+            <Pressable
+              onPress={reset}
+              style={({ pressed }) => [styles.primaryBtn, styles.newBtn, pressed && { opacity: 0.85 }]}
+            >
               <Text style={styles.primaryBtnText}>New research</Text>
             </Pressable>
           </ScrollView>
@@ -326,8 +337,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
   flex: { flex: 1 },
 
-  composeWrap: { padding: theme.space(5), gap: theme.space(4) },
-  lead: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 21 },
+  composeWrap: { paddingHorizontal: theme.space(5), paddingBottom: theme.space(5), gap: theme.space(4) },
+  leadHead: { alignItems: 'center', gap: theme.space(3) },
+  lead: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 21, textAlign: 'center' },
   queryInput: {
     color: theme.color.text,
     fontSize: theme.font.body,
@@ -352,7 +364,7 @@ const styles = StyleSheet.create({
 
   errorText: { color: theme.color.danger, fontSize: theme.font.body, lineHeight: 21 },
 
-  runningWrap: { flex: 1, padding: theme.space(5), gap: theme.space(4) },
+  runningWrap: { flex: 1, paddingHorizontal: theme.space(5), paddingBottom: theme.space(5), gap: theme.space(4) },
   runningHead: { flexDirection: 'row', alignItems: 'center', gap: theme.space(3) },
   runningQuery: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '600', flexShrink: 1, lineHeight: 21 },
   log: {
@@ -375,7 +387,7 @@ const styles = StyleSheet.create({
   },
   cancelText: { color: theme.color.danger, fontSize: theme.font.body, fontWeight: '600' },
 
-  reportWrap: { padding: theme.space(5) },
+  reportWrap: { paddingHorizontal: theme.space(5), paddingBottom: theme.space(5) },
   reportQuery: { color: theme.color.text, fontSize: theme.font.title, fontWeight: '700', lineHeight: 26 },
   divider: { height: 1, backgroundColor: theme.color.border, marginVertical: theme.space(4) },
   sources: { marginTop: theme.space(6), gap: theme.space(2.5) },
@@ -386,7 +398,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.border,
     borderRadius: theme.radius.sm,
     padding: theme.space(3),
-    gap: 2,
+    gap: theme.space(0.5),
   },
   sourceTitle: { color: theme.color.text, fontSize: theme.font.small, fontWeight: '600' },
   sourceUrl: { color: theme.color.accent, fontSize: theme.font.small },

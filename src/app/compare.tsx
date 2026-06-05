@@ -22,9 +22,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Markdown from '@/components/markdown';
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { theme } from '@/constants/theme';
 import {
@@ -231,6 +233,7 @@ export default function CompareScreen() {
     const text = prompt.trim();
     if (!text || !pairing || !choiceA || !choiceB || running) return;
 
+    Haptics.selectionAsync().catch(() => {});
     // Fresh run: cancel anything lingering, reset both panes + the vote.
     stopStreams();
     setRunning(true);
@@ -286,6 +289,7 @@ export default function CompareScreen() {
   const vote = useCallback(
     async (winner: Winner) => {
       if (!pairing || !choiceA || !choiceB || voted) return;
+      Haptics.selectionAsync().catch(() => {});
       setVoted(winner); // optimistic lock
       setVoteError(null);
       try {
@@ -343,6 +347,7 @@ export default function CompareScreen() {
         </View>
       ) : setup.kind === 'no_models' ? (
         <View style={styles.center}>
+          <NavIcon name="compare" size={40} color={theme.color.textFaint} />
           <Text style={styles.emptyTitle}>No models available</Text>
           <Text style={styles.emptyHint}>
             Add and enable at least one model endpoint in Odysseus on the server, then reopen this screen.
@@ -370,7 +375,7 @@ export default function CompareScreen() {
             }
           >
             {/* Prompt */}
-            <TextInput
+            <TextInput keyboardAppearance="dark"
               style={styles.promptInput}
               placeholder="Prompt to send to both models…"
               placeholderTextColor={theme.color.textFaint}
@@ -400,7 +405,7 @@ export default function CompareScreen() {
             {/* Run / Stop */}
             {running ? (
               <Pressable
-                style={[styles.primaryBtn, styles.stopBtn]}
+                style={({ pressed }) => [styles.primaryBtn, styles.stopBtn, pressed && { opacity: 0.85 }]}
                 onPress={onStop}
                 accessibilityRole="button"
                 accessibilityLabel="Stop comparison"
@@ -409,7 +414,11 @@ export default function CompareScreen() {
               </Pressable>
             ) : (
               <Pressable
-                style={[styles.primaryBtn, !prompt.trim() && styles.primaryBtnOff]}
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  !prompt.trim() && styles.primaryBtnOff,
+                  pressed && !!prompt.trim() && { opacity: 0.85 },
+                ]}
                 onPress={onRun}
                 disabled={!prompt.trim()}
                 accessibilityRole="button"
@@ -489,7 +498,12 @@ function ModelPicker({
           return (
             <Pressable
               key={`${c.endpoint_id}:${c.model}`}
-              style={[styles.chip, on && styles.chipOn, disabled && styles.chipDisabled]}
+              style={({ pressed }) => [
+                styles.chip,
+                on && styles.chipOn,
+                disabled && styles.chipDisabled,
+                pressed && !disabled && { opacity: 0.6 },
+              ]}
               onPress={() => onSelect(c)}
               disabled={disabled}
               accessibilityRole="button"
@@ -542,7 +556,12 @@ function VoteBtn({
 }) {
   return (
     <Pressable
-      style={[styles.voteBtn, active && styles.voteBtnOn, disabled && !active && styles.voteBtnOff]}
+      style={({ pressed }) => [
+        styles.voteBtn,
+        active && styles.voteBtnOn,
+        disabled && !active && styles.voteBtnOff,
+        pressed && !disabled && { opacity: 0.6 },
+      ]}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
@@ -566,6 +585,7 @@ function HistoryRow({ item, onDelete }: { item: CompareRecord; onDelete: () => v
         <Pressable
           hitSlop={10}
           onPress={onDelete}
+          style={({ pressed }) => pressed && { opacity: 0.6 }}
           accessibilityRole="button"
           accessibilityLabel="Delete comparison"
         >
@@ -595,7 +615,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.space(8), gap: theme.space(2.5) },
 
-  scroll: { padding: theme.space(4), gap: theme.space(4) },
+  scroll: { paddingHorizontal: theme.space(4), paddingBottom: theme.space(4), gap: theme.space(4) },
 
   emptyTitle: { color: theme.color.text, fontSize: 18, fontWeight: '600' },
   emptyHint: { color: theme.color.textFaint, fontSize: theme.font.small, textAlign: 'center', lineHeight: 19 },
@@ -631,6 +651,8 @@ const styles = StyleSheet.create({
     borderColor: theme.color.border,
     backgroundColor: theme.color.surface,
     maxWidth: 220,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   chipOn: { backgroundColor: theme.color.accentDim, borderColor: theme.color.accent },
   chipDisabled: { opacity: 0.5 },
@@ -682,6 +704,8 @@ const styles = StyleSheet.create({
     borderColor: theme.color.border,
     backgroundColor: theme.color.surface,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   voteBtnOn: { backgroundColor: theme.color.accentDim, borderColor: theme.color.accent },
   voteBtnOff: { opacity: 0.4 },

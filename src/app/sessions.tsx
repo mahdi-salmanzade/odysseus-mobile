@@ -9,7 +9,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { memo, useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Platform,
@@ -20,9 +19,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import { ApiError, deleteSession, listSessions, renameSession, type Session } from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
@@ -88,6 +90,7 @@ export default function SessionsScreen() {
       setSessions((s) => s.map((x) => (x.id === id ? { ...x, name: trimmed } : x)));
       try {
         await renameSession(pairing, id, trimmed);
+        Haptics.selectionAsync().catch(() => {});
       } catch (e) {
         setSessions(prev);
         Alert.alert('Rename failed', e instanceof ApiError ? e.message : 'Could not rename the session.');
@@ -130,6 +133,7 @@ export default function SessionsScreen() {
             setSessions((s) => s.filter((x) => x.id !== item.id));
             try {
               await deleteSession(pairing, item.id);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             } catch (e) {
               setSessions(prev);
               Alert.alert('Delete failed', e instanceof ApiError ? e.message : 'Could not delete the session.');
@@ -147,7 +151,7 @@ export default function SessionsScreen() {
       return (
         <View style={styles.card}>
           <Pressable
-            style={styles.cardMain}
+            style={({ pressed }) => [styles.cardMain, pressed && !editing && { opacity: 0.7 }]}
             onPress={() => open(item.id)}
             disabled={editing}
             android_ripple={{ color: theme.color.surfaceAlt }}
@@ -173,7 +177,7 @@ export default function SessionsScreen() {
             <View style={styles.actions}>
               <Pressable
                 hitSlop={8}
-                style={styles.actionBtn}
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
                 onPress={() => startRename(item)}
                 accessibilityRole="button"
                 accessibilityLabel="Rename session"
@@ -182,7 +186,7 @@ export default function SessionsScreen() {
               </Pressable>
               <Pressable
                 hitSlop={8}
-                style={styles.actionBtn}
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
                 onPress={() => confirmDelete(item)}
                 accessibilityRole="button"
                 accessibilityLabel="Delete session"
@@ -201,18 +205,16 @@ export default function SessionsScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScreenHeader title="Sessions" onMenu={openSidebar} />
 
-      {status.kind === 'loading' && (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.color.accent} />
-          <Text style={styles.dim}>Loading sessions…</Text>
-        </View>
-      )}
+      {status.kind === 'loading' && <SkeletonList />}
 
       {status.kind === 'error' && (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>Couldn’t load sessions</Text>
           <Text style={styles.dim}>{status.message}</Text>
-          <Pressable style={styles.retry} onPress={() => load('initial')}>
+          <Pressable
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.6 }]}
+            onPress={() => load('initial')}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
@@ -229,8 +231,9 @@ export default function SessionsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
+              <NavIcon name="sessions" size={40} color={theme.color.textFaint} />
               <Text style={styles.emptyTitle}>No sessions yet</Text>
-              <Text style={styles.dim}>Start a conversation from the chat tab — it’ll show up here.</Text>
+              <Text style={styles.dim}>Start a conversation from the chat tab and it’ll show up here.</Text>
             </View>
           }
         />
@@ -253,7 +256,7 @@ const RenameInput = memo(function RenameInput({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <TextInput
+    <TextInput keyboardAppearance="dark"
       style={styles.editInput}
       value={value}
       onChangeText={setValue}
@@ -269,20 +272,20 @@ const RenameInput = memo(function RenameInput({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 10 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.space(8), gap: theme.space(2.5) },
   dim: { color: theme.color.textDim, textAlign: 'center', fontSize: theme.font.body, lineHeight: 21 },
   emptyTitle: { color: theme.color.text, fontSize: 18, fontWeight: '600' },
   retry: {
-    marginTop: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    marginTop: theme.space(1.5),
+    paddingHorizontal: theme.space(4.5),
+    paddingVertical: theme.space(2.5),
     borderRadius: theme.radius.pill,
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.color.border,
   },
   retryText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
-  listContent: { padding: 14, gap: 10, flexGrow: 1 },
+  listContent: { paddingHorizontal: theme.space(3.5), paddingBottom: theme.space(3.5), gap: theme.space(2.5), flexGrow: 1 },
   card: {
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.md,
@@ -290,9 +293,9 @@ const styles = StyleSheet.create({
     borderColor: theme.color.border,
     overflow: 'hidden',
   },
-  cardMain: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 6 },
+  cardMain: { paddingHorizontal: theme.space(4), paddingTop: theme.space(3.5), paddingBottom: theme.space(3), gap: theme.space(1.5) },
   name: { color: theme.color.text, fontSize: theme.font.body, fontWeight: '600' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },
   model: { color: theme.color.textFaint, fontSize: theme.font.small, flexShrink: 1 },
   tag: {
     color: theme.color.warn,
@@ -300,7 +303,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: 6,
+    paddingHorizontal: theme.space(1.5),
     paddingVertical: 1,
     overflow: 'hidden',
   },
@@ -309,15 +312,15 @@ const styles = StyleSheet.create({
     fontSize: theme.font.body,
     backgroundColor: theme.color.surfaceAlt,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: theme.space(2.5),
+    paddingVertical: theme.space(2),
   },
   actions: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
   },
-  actionBtn: { flex: 1, paddingVertical: 10, alignItems: 'center' },
+  actionBtn: { flex: 1, minHeight: 44, paddingVertical: theme.space(2.5), alignItems: 'center', justifyContent: 'center' },
   actionText: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
   deleteText: { color: theme.color.danger },
 });
