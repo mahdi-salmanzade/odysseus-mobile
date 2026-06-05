@@ -24,6 +24,8 @@
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Odysseus connects to your self-hosted Odysseus server on your local network so you can chat with it.",
         "NSCameraUsageDescription": "Odysseus uses the camera to scan the pairing QR code shown by your Odysseus server.",
+        "NSPhotoLibraryUsageDescription": "Odysseus can read a saved image from your photo library so you can scan a pairing QR code you've stored.",
+        "NSPhotoLibraryAddUsageDescription": "Odysseus can save a pairing QR code image to your photo library.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }

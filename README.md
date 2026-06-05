@@ -137,6 +137,21 @@ src/
   constants/theme.ts
 ```
 
+## Permissions
+
+The app declares only what it needs, each with a clear purpose string:
+
+- **Camera** — scan the pairing QR code shown by your Odysseus server.
+- **Photo Library** — read a stored screenshot to scan a QR code you've saved.
+  (Also linked by the camera SDK, so iOS requires the string even if you never
+  pick from the library.)
+- **Microphone** + **Speech Recognition** — optional on-device speech-to-text
+  for composing a message by voice.
+- **Local Network** — reach your Odysseus server over the LAN.
+
+None of these send data anywhere but your own server. You can decline any of them
+and still pair manually and chat by typing.
+
 ## Security
 
 The pairing token grants chat access to your Odysseus. It lives only in this
