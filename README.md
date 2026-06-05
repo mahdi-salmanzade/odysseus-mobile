@@ -13,6 +13,10 @@ your network.
 
 Built with **Expo SDK 56** (React Native 0.85, React 19, expo-router).
 
+Runs natively on **iPhone and iPad** from a single universal build — the iPad
+gets the full app, not a stretched phone view. (iPad screenshots:
+[`screenshots-ipad/`](screenshots-ipad/README.md).)
+
 <p align="center">
   <img src="screenshots/1.jpeg" width="30%" alt="Home screen with the Odysseus Mobile app icon" />
   &nbsp;&nbsp;
