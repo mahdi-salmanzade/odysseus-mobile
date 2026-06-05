@@ -508,9 +508,11 @@ export default function ChatScreen() {
         <View style={styles.headerCenter}>
           <View style={styles.brandRow}>
             <OdysseusLogo size={22} />
-            <Text style={styles.brand}>Odysseus</Text>
+            <Text style={styles.brand} maxFontSizeMultiplier={1.4}>
+              Odysseus
+            </Text>
           </View>
-          <Text style={styles.model} numberOfLines={1}>
+          <Text style={styles.model} numberOfLines={1} maxFontSizeMultiplier={1.4}>
             {session?.model || choice?.label || '…'}
           </Text>
         </View>
@@ -607,18 +609,46 @@ export default function ChatScreen() {
                   <OdysseusWordmark size={40} />
                 </View>
                 <Text style={styles.emptyTagline}>Yours for the voyage.</Text>
+                <Text style={styles.emptyHint}>
+                  Ask anything. Toggle Web for live results, Research for a deeper report.
+                </Text>
               </View>
             }
           />
 
           <View style={styles.toolbar}>
-            <Toggle label="Web" active={useWeb} disabled={streaming} onPress={() => setUseWeb((v) => !v)} />
-            <Toggle label="Research" active={useResearch} disabled={streaming} onPress={() => setUseResearch((v) => !v)} />
+            {/* Chat / Agent / Research is a single mode, not three free switches:
+                the server resolves research > agent > chat, so Research and Agent
+                are mutually exclusive here, and Web (an augmentation) is redundant
+                under Research, which runs its own web search. */}
+            <Toggle
+              label="Web"
+              active={useWeb}
+              disabled={streaming || useResearch}
+              onPress={() => setUseWeb((v) => !v)}
+            />
+            <Toggle
+              label="Research"
+              active={useResearch}
+              disabled={streaming}
+              onPress={() => {
+                const next = !useResearch;
+                setUseResearch(next);
+                if (next) {
+                  setAgentMode(false);
+                  setUseWeb(false);
+                }
+              }}
+            />
             <Toggle
               label={agentMode ? 'Agent' : 'Chat'}
               active={agentMode}
               disabled={streaming}
-              onPress={() => setAgentMode((v) => !v)}
+              onPress={() => {
+                const next = !agentMode;
+                setAgentMode(next);
+                if (next) setUseResearch(false);
+              }}
             />
           </View>
 
@@ -654,8 +684,12 @@ export default function ChatScreen() {
               <Pressable
                 style={({ pressed }) => [styles.sendBtn, styles.stopBtn, pressed && { opacity: 0.85 }]}
                 onPress={stop}
+                accessibilityRole="button"
+                accessibilityLabel="Stop generating"
               >
-                <Text style={styles.stopText}>■</Text>
+                <Text style={styles.stopText} maxFontSizeMultiplier={1.2}>
+                  ■
+                </Text>
               </Pressable>
             ) : (
               <Pressable
@@ -666,8 +700,13 @@ export default function ChatScreen() {
                 ]}
                 onPress={send}
                 disabled={!input.trim()}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
+                accessibilityState={{ disabled: !input.trim() }}
               >
-                <Text style={styles.sendText}>↑</Text>
+                <Text style={styles.sendText} maxFontSizeMultiplier={1.2}>
+                  ↑
+                </Text>
               </Pressable>
             )}
           </View>
@@ -706,7 +745,12 @@ function Toggle({
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled: !!disabled }}
     >
-      <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{label}</Text>
+      <Text
+        style={[styles.toggleText, active && styles.toggleTextActive]}
+        maxFontSizeMultiplier={1.3}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -731,6 +775,17 @@ function Bubble({ message, onCopy }: { message: ChatRow; onCopy: (content: strin
           <Text style={styles.userText}>…</Text>
         )}
         {!isUser && message.sources ? <Sources sources={message.sources} /> : null}
+        {!isUser && message.content && message.content !== RESEARCHING ? (
+          <Pressable
+            onPress={() => onCopy(message.content)}
+            hitSlop={10}
+            style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Copy message"
+          >
+            <Text style={styles.copyText}>Copy</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -827,6 +882,15 @@ const styles = StyleSheet.create({
     fontSize: theme.font.body,
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   },
+  // One quiet line of orientation under the brand splash: a way in, not a wall.
+  emptyHint: {
+    color: theme.color.textFaint,
+    fontSize: theme.font.small,
+    lineHeight: 19,
+    textAlign: 'center',
+    maxWidth: 280,
+    marginTop: theme.space(1),
+  },
   // Header owns the top gap (its marginBottom); list keeps only side + bottom.
   listContent: { paddingHorizontal: theme.space(3.5), paddingBottom: theme.space(3.5), flexGrow: 1 },
 
@@ -845,7 +909,10 @@ const styles = StyleSheet.create({
     borderColor: theme.color.danger,
   },
   bannerText: { flex: 1, color: theme.color.text, fontSize: theme.font.small, lineHeight: 18 },
-  bannerRetry: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '700' },
+  // Lamplit White, not Ember Coral: this Retry can share the screen with the
+  // danger-colored Stop button, and coral-inside-a-danger-box collides with the
+  // Two Reds Rule. White-bold keeps the affordance without abutting the reds.
+  bannerRetry: { color: theme.color.text, fontSize: theme.font.small, fontWeight: '700' },
 
   // Message bubbles (inline, so assistant content can host the markdown view).
   row: { width: '100%', marginVertical: theme.space(1), flexDirection: 'row' },
@@ -860,6 +927,16 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: theme.radius.sm,
   },
   userText: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
+
+  // Discoverable copy on assistant replies; long-press the bubble still works too.
+  copyBtn: { alignSelf: 'flex-start', marginTop: theme.space(2), paddingVertical: theme.space(0.5) },
+  copyText: {
+    color: theme.color.textFaint,
+    fontSize: theme.font.small,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 
   // Citation block under an assistant bubble.
   sources: {
@@ -883,9 +960,17 @@ const styles = StyleSheet.create({
 
   toolbar: {
     flexDirection: 'row',
+    // Wrap rather than clip if the pills grow under large accessibility text.
+    flexWrap: 'wrap',
     gap: theme.space(2),
     paddingHorizontal: theme.space(3),
-    paddingTop: theme.space(2),
+    // A single hairline separates the conversation from the input cluster (the
+    // toggles + composer below it), per the design system's "hairline carries
+    // separation" law. The toolbar, not the composer, owns it because it's the
+    // topmost element of the cluster against the transcript.
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
+    paddingTop: theme.space(2.5),
   },
   toggle: {
     paddingHorizontal: theme.space(3),
