@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app-icon.png" width="116" alt="Odysseus Mobile app icon: a coral sail on a dark rounded square" />
+</p>
+
 # Odysseus Mobile
 
 **Version 1.0.0**
