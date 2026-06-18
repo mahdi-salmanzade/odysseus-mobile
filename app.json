@@ -65,6 +65,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Odysseus can attach a photo from your library to a message."
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Odysseus uses the microphone to turn your speech into a message you can send.",

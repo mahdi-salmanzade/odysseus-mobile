@@ -1,10 +1,14 @@
 import * as Clipboard from 'expo-clipboard';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { Link, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -16,13 +20,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MenuIcon, MicIcon, SettingsIcon } from '@/components/header-icons';
+import { AttachIcon, MenuIcon, MicIcon, SettingsIcon } from '@/components/header-icons';
 import Markdown from '@/components/markdown';
 import { OdysseusLogo } from '@/components/odysseus-logo';
 import { OdysseusWordmark } from '@/components/odysseus-wordmark';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
+  attachmentThumbSource,
   createSession,
   flattenModels,
   getHistory,
@@ -30,24 +35,60 @@ import {
   listSessions,
   sourcesFromMetadata,
   streamChat,
+  upload,
   type ChatMessage,
   type ChatSources,
   type ModelChoice,
+  type PickedFile,
   type Session,
 } from '@/lib/api';
 import { useDictation } from '@/lib/dictation';
+import type { Pairing } from '@/lib/pairing';
 import { usePairing } from '@/lib/pairing-context';
 import { loadModelPref } from '@/lib/prefs';
 import { useSidebar } from '@/lib/sidebar-context';
 
-/** A rendered chat row — a message plus any citations the server attached. */
-type ChatRow = ChatMessage & { id: string; sources?: ChatSources };
+/** An attachment shown on a user message: a just-picked local file (has `uri`),
+ *  a server-stored one rehydrated from history (has `id`), or both once the
+ *  local file has been uploaded. `mime` drives image-vs-file rendering. */
+type ChatAttachment = { id?: string; uri?: string; name: string; mime?: string };
+
+/** A rendered chat row — a message, any citations, and any attachments. */
+type ChatRow = ChatMessage & { id: string; sources?: ChatSources; attachments?: ChatAttachment[] };
+
+/** A file picked into the composer tray, awaiting upload on send. `key` is a
+ *  stable list key (the local uri can repeat if the same photo is re-added). */
+type PendingAttachment = PickedFile & { key: string };
 
 // Monotonic row id. We locate the in-flight assistant row by id rather than by
 // a frozen array index, so a stream callback can never append tokens to the
 // wrong row if the list shifts underneath it.
 let _rowSeq = 0;
 const newRowId = () => `r${++_rowSeq}`;
+// Stable keys for composer-tray attachments, independent of their (re-usable) uri.
+let _attSeq = 0;
+const newAttKey = () => `a${++_attSeq}`;
+
+/** Rehydrate the attachments a user message was sent with, from its persisted
+ *  metadata (`{ id, name, mime, ... }[]`). Defensive: tolerates a missing or
+ *  oddly-shaped field rather than throwing while rendering history. */
+function attachmentsFromMetadata(metadata: Record<string, unknown> | undefined): ChatAttachment[] | undefined {
+  const raw = metadata?.attachments;
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: ChatAttachment[] = [];
+  for (const a of raw) {
+    if (!a || typeof a !== 'object') continue;
+    const o = a as Record<string, unknown>;
+    const id = typeof o.id === 'string' ? o.id : undefined;
+    if (!id) continue;
+    out.push({
+      id,
+      name: typeof o.name === 'string' ? o.name : id,
+      mime: typeof o.mime === 'string' ? o.mime : undefined,
+    });
+  }
+  return out.length ? out : undefined;
+}
 
 // Shown in the assistant bubble while a background research task runs — research
 // streams no answer text (the report lands in history when it finishes).
@@ -114,6 +155,8 @@ export default function ChatScreen() {
   const [useWeb, setUseWeb] = useState(false);
   const [useResearch, setUseResearch] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
+  // Files picked into the composer tray, uploaded on send. Cleared after send.
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
 
   const abortRef = useRef<(() => void) | null>(null);
   // Cancellation token for the CURRENT send. A New Chat's first send awaits
@@ -296,6 +339,8 @@ export default function ChatScreen() {
             content: m.content,
             // Rehydrate the citation footer the server persisted with this reply.
             sources: m.role === 'assistant' ? sourcesFromMetadata(m.metadata) : undefined,
+            // Rehydrate any attachments this user message was sent with.
+            attachments: m.role === 'user' ? attachmentsFromMetadata(m.metadata) : undefined,
           }));
         const meta = list.find((s) => s.id === sessionParam) ?? null;
         setSession(
@@ -317,13 +362,63 @@ export default function ChatScreen() {
     };
   }, [pairing, sessionParam, scrollToEnd, convoReload]);
 
+  const removePending = useCallback(
+    (key: string) => setPending((prev) => prev.filter((x) => x.key !== key)),
+    [],
+  );
+
+  const pickImage = useCallback(async () => {
+    // Photo-library access needs permission; ask, and bail gracefully if denied.
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Photos permission needed', 'Allow photo access in Settings to attach images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled) return;
+    const a = result.assets[0];
+    setPending((prev) => [
+      ...prev,
+      {
+        key: newAttKey(),
+        uri: a.uri,
+        name: a.fileName ?? a.uri.split('/').pop() ?? 'image.jpg',
+        mimeType: a.mimeType ?? 'image/jpeg',
+      },
+    ]);
+  }, []);
+
+  const pickDocument = useCallback(async () => {
+    // copyToCacheDirectory keeps the uri readable when we upload it on send.
+    const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const a = result.assets[0];
+    setPending((prev) => [
+      ...prev,
+      { key: newAttKey(), uri: a.uri, name: a.name, mimeType: a.mimeType },
+    ]);
+  }, []);
+
+  const pickAttachment = useCallback(() => {
+    if (streaming) return;
+    Alert.alert('Add attachment', undefined, [
+      { text: 'Photo', onPress: () => void pickImage() },
+      { text: 'File', onPress: () => void pickDocument() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [streaming, pickImage, pickDocument]);
+
   const send = useCallback(() => {
     const text = input.trim();
     if (!text || !pairing || !choice || streaming) return;
+    // Snapshot the tray now and clear it; the upload happens inside the async
+    // body below, but the composer should empty immediately on send.
+    const atts = pending;
     // End any live dictation first so a late transcript can't repopulate the
     // input we're about to clear (cancel mutes the sink, unlike stop).
     cancelDictation();
     setInput('');
+    setPending([]);
     setStreaming(true);
 
     // This send's cancellation token. Stop / conversation-switch flip it.
@@ -333,7 +428,15 @@ export default function ChatScreen() {
     const assistantId = newRowId();
     setMessages((prev) => [
       ...prev,
-      { id: newRowId(), role: 'user', content: text },
+      {
+        id: newRowId(),
+        role: 'user',
+        content: text,
+        // Show local previews immediately; the bytes upload below before the stream.
+        attachments: atts.length
+          ? atts.map((a) => ({ uri: a.uri, name: a.name, mime: a.mimeType }))
+          : undefined,
+      },
       { id: assistantId, role: 'assistant', content: '' },
     ]);
     scrollToEnd({ force: true, animated: true });
@@ -409,6 +512,26 @@ export default function ChatScreen() {
       }
 
       if (token.cancelled) return;
+
+      // Upload picked files (owner-attributed via the companion bridge) and
+      // collect their ids for the chat send. A failure here surfaces in the
+      // assistant bubble rather than sending a message whose attachments would
+      // be silently dropped server-side.
+      let attachmentIds: string[] = [];
+      if (atts.length) {
+        try {
+          const uploaded = await Promise.all(
+            atts.map((a) => upload(pairing, { uri: a.uri, name: a.name, mimeType: a.mimeType })),
+          );
+          attachmentIds = uploaded.map((u) => u.id);
+        } catch (e) {
+          if (token.cancelled) return;
+          failAssistant(e instanceof ApiError ? e.message : 'Could not upload the attachment.');
+          return;
+        }
+        if (token.cancelled) return;
+      }
+
       const activeId = active.id;
       abortRef.current = streamChat(
         pairing,
@@ -418,6 +541,7 @@ export default function ChatScreen() {
           mode: agentMode ? 'agent' : 'chat',
           useWeb,
           useResearch,
+          attachmentIds: attachmentIds.length ? attachmentIds : undefined,
         },
         {
           onDelta: (delta) => {
@@ -469,7 +593,7 @@ export default function ChatScreen() {
         },
       );
     })();
-  }, [input, pairing, choice, session, streaming, scrollToEnd, agentMode, useWeb, useResearch, cancelDictation]);
+  }, [input, pairing, choice, session, streaming, scrollToEnd, agentMode, useWeb, useResearch, pending, cancelDictation]);
 
   const stop = useCallback(() => {
     // Cancel a send that's still awaiting createSession, then abort the stream.
@@ -598,7 +722,7 @@ export default function ChatScreen() {
             ref={listRef}
             data={messages}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <Bubble message={item} onCopy={copyMessage} />}
+            renderItem={({ item }) => <Bubble message={item} onCopy={copyMessage} pairing={pairing} />}
             contentContainerStyle={styles.listContent}
             onScroll={onScroll}
             scrollEventThrottle={100}
@@ -652,7 +776,44 @@ export default function ChatScreen() {
             />
           </View>
 
+          {pending.length > 0 && (
+            <View style={styles.tray}>
+              {pending.map((a) => (
+                <View key={a.key} style={styles.trayItem}>
+                  {(a.mimeType ?? '').startsWith('image/') ? (
+                    <Image source={{ uri: a.uri }} style={styles.trayThumb} />
+                  ) : (
+                    <View style={styles.trayFile}>
+                      <Text style={styles.trayFileName} numberOfLines={3}>
+                        {a.name}
+                      </Text>
+                    </View>
+                  )}
+                  <Pressable
+                    style={({ pressed }) => [styles.trayRemove, pressed && { opacity: 0.6 }]}
+                    onPress={() => removePending(a.key)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${a.name}`}
+                  >
+                    <Text style={styles.trayRemoveText}>×</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.composer}>
+            {!streaming && (
+              <Pressable
+                style={({ pressed }) => [styles.micBtn, pressed && { opacity: 0.6 }]}
+                onPress={pickAttachment}
+                accessibilityRole="button"
+                accessibilityLabel="Add attachment"
+              >
+                <AttachIcon size={20} color={theme.color.textDim} />
+              </Pressable>
+            )}
             <TextInput keyboardAppearance="dark"
               style={styles.input}
               value={input}
@@ -756,7 +917,15 @@ function Toggle({
 }
 
 /** User messages stay plain; assistant content goes through the markdown renderer. */
-function Bubble({ message, onCopy }: { message: ChatRow; onCopy: (content: string) => void }) {
+function Bubble({
+  message,
+  onCopy,
+  pairing,
+}: {
+  message: ChatRow;
+  onCopy: (content: string) => void;
+  pairing: Pairing | null;
+}) {
   const isUser = message.role === 'user';
   return (
     <Pressable
@@ -765,6 +934,34 @@ function Bubble({ message, onCopy }: { message: ChatRow; onCopy: (content: strin
       style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}
     >
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+        {isUser && message.attachments?.length ? (
+          <View style={styles.bubbleAtts}>
+            {message.attachments.map((a, i) => {
+              // Decide image-vs-file by mime alone. Picked photos always carry a
+              // mime (pickImage defaults to image/jpeg), so this renders images as
+              // thumbnails while a mime-less document falls to the file chip rather
+              // than a broken <Image>.
+              const isImage = (a.mime ?? '').startsWith('image/');
+              // Prefer the local uri (instant, pre-upload); fall back to the
+              // owner-scoped server thumbnail when rehydrated from history.
+              const src = a.uri
+                ? { uri: a.uri }
+                : pairing && a.id
+                  ? attachmentThumbSource(pairing, a.id)
+                  : null;
+              const key = a.id ?? a.uri ?? String(i);
+              return isImage && src ? (
+                <Image key={key} source={src} style={styles.bubbleThumb} resizeMode="cover" />
+              ) : (
+                <View key={key} style={styles.bubbleFile}>
+                  <Text style={styles.bubbleFileName} numberOfLines={1}>
+                    {a.name}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
         {isUser ? (
           <Text style={styles.userText} selectable>
             {message.content}
@@ -1030,4 +1227,53 @@ const styles = StyleSheet.create({
   sendText: { color: theme.color.onAccent, fontSize: 20, fontWeight: '800' },
   stopBtn: { backgroundColor: theme.color.danger },
   stopText: { color: theme.color.onAccent, fontSize: 16, fontWeight: '800' },
+
+  // Composer attachment tray (picked-but-not-yet-sent files).
+  tray: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space(2.5),
+    paddingHorizontal: theme.space(3),
+    paddingTop: theme.space(2),
+  },
+  trayItem: { position: 'relative' },
+  trayThumb: { width: 64, height: 64, borderRadius: theme.radius.md, backgroundColor: theme.color.surface },
+  trayFile: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.surface,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    padding: theme.space(1.5),
+    justifyContent: 'center',
+  },
+  trayFileName: { color: theme.color.textDim, fontSize: 10, lineHeight: 12 },
+  trayRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.color.dangerSurface,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trayRemoveText: { color: theme.color.text, fontSize: 13, lineHeight: 15, fontWeight: '700' },
+
+  // Attachments rendered inside a sent user bubble.
+  bubbleAtts: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space(2), marginBottom: theme.space(2) },
+  bubbleThumb: { width: 168, height: 168, borderRadius: theme.radius.md, backgroundColor: theme.color.surfaceAlt },
+  bubbleFile: {
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(2),
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  bubbleFileName: { color: theme.color.text, fontSize: theme.font.small },
 });

@@ -42,6 +42,21 @@ export function MicIcon({ size = 22, color = theme.color.textDim }: { size?: num
   );
 }
 
+/** Paperclip — opens the attachment picker in the composer. */
+export function AttachIcon({ size = 22, color = theme.color.textDim }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20.5 11.5l-8.07 8.07a5 5 0 0 1-7.07-7.07l8.06-8.06a3.33 3.33 0 0 1 4.71 4.71l-8.06 8.06a1.67 1.67 0 0 1-2.36-2.36l7.36-7.35"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /** Gear / cog — opens Settings. */
 export function SettingsIcon({ size = 22, color = theme.color.textDim }: { size?: number; color?: string }) {
   return (

@@ -8,6 +8,7 @@
  *   - global `fetch`     — used by api.ts `request()` for normal JSON/form calls
  *   - `expo/fetch`       — used by api.ts for the SSE streaming endpoints
  */
+import * as ExpoFS from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 
 import {
@@ -20,6 +21,7 @@ import {
   flattenModels,
   sourcesFromMetadata,
   streamChat,
+  upload,
   setUnauthorizedHandler,
   type ModelEndpoint,
 } from '@/lib/api';
@@ -27,6 +29,18 @@ import { type Pairing } from '@/lib/pairing';
 
 jest.mock('@/lib/log', () => ({ dlog: () => {} }));
 jest.mock('expo/fetch', () => ({ fetch: jest.fn() }));
+// upload() uses expo-file-system's native multipart uploader (File(...).upload).
+// Mock the File class so a shared `upload` jest.fn records the call and drives the
+// result — this exercises the REAL upload() code path (unlike stubbing FormData).
+jest.mock('expo-file-system', () => {
+  const upload = jest.fn();
+  return {
+    __esModule: true,
+    UploadType: { MULTIPART: 1, BINARY_CONTENT: 0 },
+    File: jest.fn(() => ({ upload })),
+    _upload: upload,
+  };
+});
 
 const P: Pairing = { v: 1, host: '192.168.1.50', port: 7000, token: 'ody_abcdefgh' };
 const BASE = 'http://192.168.1.50:7000';
@@ -284,5 +298,86 @@ describe('streamChat SSE parsing', () => {
     expect(out.text).toBe('partial');
     expect(out.error).toBeInstanceOf(ApiError);
     expect(out.error?.kind).toBe('network');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attachment upload + send. Pins the multipart contract (field name `files`, no
+// hand-set Content-Type so the runtime adds the boundary, the companion route)
+// and that chat passes the resulting ids through as a JSON-string form field.
+// ---------------------------------------------------------------------------
+
+describe('upload (native multipart via expo-file-system)', () => {
+  // Shared handles to the mocked File class + its upload() fn (see jest.mock above).
+  const FileMock = ExpoFS.File as unknown as jest.Mock;
+  const uploadMock = (ExpoFS as unknown as { _upload: jest.Mock })._upload;
+
+  test('streams the picked file to the companion route as multipart field `files`, returns the record', async () => {
+    uploadMock.mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: JSON.stringify({ files: [{ id: 'f1', name: 'p.jpg', mime: 'image/jpeg', size: 10, width: 2, height: 3 }] }),
+    });
+
+    const out = await upload(P, { uri: 'file:///tmp/p.jpg', name: 'p.jpg', mimeType: 'image/jpeg' });
+    expect(out).toEqual({ id: 'f1', name: 'p.jpg', mime: 'image/jpeg', size: 10, width: 2, height: 3 });
+
+    // The local file uri is wrapped in expo-file-system's File.
+    expect(FileMock).toHaveBeenCalledWith('file:///tmp/p.jpg');
+    const [url, opts] = uploadMock.mock.calls[0];
+    // Goes through the companion bridge (owner-attributed), NOT stock /api/upload.
+    expect(url).toBe(`${BASE}/api/companion/upload`);
+    expect(opts.uploadType).toBe(1); // UploadType.MULTIPART
+    expect(opts.fieldName).toBe('files'); // server reads List[UploadFile] under "files"
+    expect(opts.mimeType).toBe('image/jpeg');
+    expect(opts.headers.Authorization).toBe('Bearer ody_abcdefgh');
+  });
+
+  test('throws a bad_response ApiError when the server returns no files', async () => {
+    uploadMock.mockResolvedValue({ status: 200, headers: {}, body: JSON.stringify({ files: [] }) });
+    await expect(
+      upload(P, { uri: 'file:///x', name: 'x', mimeType: 'image/png' }),
+    ).rejects.toMatchObject({ kind: 'bad_response' });
+  });
+
+  test('a 401 from the upload fires the unauthorized handler and throws unauthorized', async () => {
+    const onUnauth = jest.fn();
+    setUnauthorizedHandler(onUnauth);
+    uploadMock.mockResolvedValue({ status: 401, headers: {}, body: '' });
+    await expect(
+      upload(P, { uri: 'file:///x', name: 'x', mimeType: 'image/png' }),
+    ).rejects.toMatchObject({ kind: 'unauthorized', status: 401 });
+    expect(onUnauth).toHaveBeenCalledTimes(1);
+  });
+
+  test('a transport failure maps to a network ApiError', async () => {
+    uploadMock.mockRejectedValue(new Error('offline'));
+    await expect(
+      upload(P, { uri: 'file:///x', name: 'x', mimeType: 'image/png' }),
+    ).rejects.toMatchObject({ kind: 'network' });
+  });
+});
+
+describe('streamChat attachments', () => {
+  test('passes attachment ids as a JSON-encoded `attachments` form field', async () => {
+    mockExpoFetch.mockResolvedValue(sseResponse(['data: [DONE]\n\n']) as never);
+    await new Promise<void>((resolve) => {
+      streamChat(
+        P,
+        { message: 'hi', session: 's1', attachmentIds: ['f1', 'f2'] },
+        { onDelta: () => {}, onDone: () => resolve() },
+      );
+    });
+    const [, init] = mockExpoFetch.mock.calls[0] as [string, { body: string }];
+    expect(init.body).toContain(`attachments=${encodeURIComponent(JSON.stringify(['f1', 'f2']))}`);
+  });
+
+  test('omits the attachments field when there are none', async () => {
+    mockExpoFetch.mockResolvedValue(sseResponse(['data: [DONE]\n\n']) as never);
+    await new Promise<void>((resolve) => {
+      streamChat(P, { message: 'hi', session: 's1' }, { onDelta: () => {}, onDone: () => resolve() });
+    });
+    const [, init] = mockExpoFetch.mock.calls[0] as [string, { body: string }];
+    expect(init.body).not.toContain('attachments=');
   });
 });

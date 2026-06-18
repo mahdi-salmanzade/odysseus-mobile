@@ -10,6 +10,7 @@
  * Streaming uses `expo/fetch` explicitly (the named import keeps streaming even
  * if EXPO_PUBLIC_USE_RN_FETCH=1 is set) and reads the SSE body incrementally.
  */
+import { File, UploadType } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 
 import { dlog } from '@/lib/log';
@@ -282,6 +283,78 @@ export async function listModels(p: Pairing): Promise<ModelEndpoint[]> {
   const res = await request(p, '/api/companion/models');
   const data = await json<{ endpoints: ModelEndpoint[] }>(res);
   return data.endpoints ?? [];
+}
+
+/** A file picked on-device, ready to upload. `mimeType`/`name` come from the
+ *  image/document picker; `uri` is the local file:// path the runtime streams. */
+export interface PickedFile {
+  uri: string;
+  name: string;
+  mimeType?: string;
+}
+
+/** Server's record of a stored attachment. `id` is what goes into a chat send. */
+export interface UploadedAttachment {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+}
+
+/**
+ * Upload one picked file and return its server attachment record. The returned
+ * `id` is then passed into {@link streamChat} as an attachment.
+ *
+ * Goes through the companion bridge (`/api/companion/upload`), NOT the stock
+ * `/api/upload`: the stock route stamps the upload's owner as the synthetic
+ * "api" pseudo-user that a bearer/paired token authenticates as, and chat then
+ * resolves attachments under the real owner — so a stock-uploaded file is
+ * silently dropped before the model sees it. The bridge stamps the real token
+ * owner, so the file is readable by the same owner's chat.
+ *
+ * Transport: expo-file-system's native multipart upload, NOT FormData-through-
+ * fetch. In SDK 56 the global `fetch` is `expo/fetch`, which throws on React
+ * Native's `{ uri, name, type }` FormData file-part ("Unsupported FormDataPart
+ * implementation"); the native uploader streams the local file straight from
+ * disk under the field name the server expects (`files` → `List[UploadFile]`),
+ * and isn't bound by the short connect timeout a large photo over the LAN blows.
+ * It runs outside `request()`, so the 401 / error handling is mirrored here.
+ */
+export async function upload(p: Pairing, file: PickedFile): Promise<UploadedAttachment> {
+  const result = await new File(file.uri)
+    .upload(`${baseUrl(p)}/api/companion/upload`, {
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'files', // server reads a List[UploadFile] under "files"
+      mimeType: file.mimeType ?? 'application/octet-stream',
+      headers: authHeaders(p),
+    })
+    .catch(() => {
+      throw new ApiError('Could not reach Odysseus to upload the attachment.', 'network');
+    });
+  if (result.status === 401) {
+    onUnauthorized?.();
+    throw new ApiError('The pairing token was rejected. Re-pair from your server.', 'unauthorized', 401);
+  }
+  if (result.status < 200 || result.status >= 300) {
+    throw new ApiError(`Upload failed (server responded ${result.status}).`, 'server', result.status);
+  }
+  let data: { files?: UploadedAttachment[] };
+  try {
+    data = JSON.parse(result.body) as { files?: UploadedAttachment[] };
+  } catch {
+    throw new ApiError('Unexpected response from server.', 'bad_response');
+  }
+  if (!data.files?.length) throw new ApiError('Upload returned no file.', 'bad_response');
+  return data.files[0];
+}
+
+/** Authenticated <Image> source for an uploaded attachment's cached thumbnail
+ *  (used to render a sent image on history reload). Mirrors {@link imageSource}
+ *  but points at the owner-scoped companion serve endpoint. */
+export function attachmentThumbSource(p: Pairing, id: string): { uri: string; headers: Record<string, string> } {
+  return imageSource(p, `/api/companion/upload/${encodeURIComponent(id)}?thumb=1`);
 }
 
 // ---------------------------------------------------------------------------
@@ -761,7 +834,14 @@ export interface ChatStreamHandlers {
  */
 export function streamChat(
   p: Pairing,
-  args: { message: string; session: string; mode?: 'chat' | 'agent'; useWeb?: boolean; useResearch?: boolean },
+  args: {
+    message: string;
+    session: string;
+    mode?: 'chat' | 'agent';
+    useWeb?: boolean;
+    useResearch?: boolean;
+    attachmentIds?: string[];
+  },
   handlers: ChatStreamHandlers,
 ): () => void {
   // The connect phase may target a host that has since moved (Wi-Fi/hotspot
@@ -813,6 +893,10 @@ export function streamChat(
           mode: args.mode ?? 'chat',
           use_web: args.useWeb ? 'true' : 'false',
           ...(args.useResearch ? { use_research: 'true' } : {}),
+          // Attachment ids as a JSON-encoded string in the form field — the server
+          // does json.loads() on `attachments` (chat_routes.py), so a list rides
+          // through the urlencoded body without switching the whole send to multipart.
+          ...(args.attachmentIds?.length ? { attachments: JSON.stringify(args.attachmentIds) } : {}),
         }),
         signal: controller.signal,
       });
