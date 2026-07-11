@@ -10,10 +10,13 @@
  * partial/streaming text, so an in-flight reply renders cleanly as it grows.
  */
 import { memo, type ReactNode } from 'react';
-import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import CodeHighlighter from 'react-native-code-highlighter';
 import { Renderer, useMarkdown, type MarkedStyles } from 'react-native-marked';
+import atomOneDark from 'react-syntax-highlighter/dist/esm/styles/hljs/atom-one-dark-reasonable';
+import atomOneLight from 'react-syntax-highlighter/dist/esm/styles/hljs/atom-one-light';
 
-import { theme } from '@/constants/theme';
+import { theme, isDarkTheme } from '@/constants/theme';
 
 /** Open a markdown link, but only if it's http(s) — link targets come from
  * untrusted LLM output, so don't hand arbitrary schemes to the OS opener. */
@@ -21,8 +24,34 @@ function openLink(href: string) {
   if (/^https?:\/\//i.test(href)) Linking.openURL(href).catch(() => {});
 }
 
+/** Syntax-highlighted, horizontally-scrollable fenced code block. Memoized on the
+ * code text so a still-streaming reply doesn't re-highlight on every token. */
+const CodeBlock = memo(function CodeBlock({
+  code,
+  language,
+  containerStyle,
+}: {
+  code: string;
+  language?: string;
+  containerStyle?: ViewStyle;
+}) {
+  return (
+    <CodeHighlighter
+      hljsStyle={isDarkTheme() ? atomOneDark : atomOneLight}
+      language={language}
+      textStyle={styles.codeText}
+      scrollViewProps={{
+        contentContainerStyle: { ...(styles.codeBox as object), ...(containerStyle ?? {}) },
+      }}
+    >
+      {code}
+    </CodeHighlighter>
+  );
+});
+
 /** Default renderer, but links are scheme-guarded and non-http(s) targets
- * render as inert text rather than becoming tappable. */
+ * render as inert text rather than becoming tappable, and fenced code blocks are
+ * syntax-highlighted. */
 class SafeRenderer extends Renderer {
   link(children: string | ReactNode[], href: string, styles?: object): ReactNode {
     if (/^https?:\/\//i.test(href)) {
@@ -33,6 +62,10 @@ class SafeRenderer extends Renderer {
       );
     }
     return this.text(children, styles);
+  }
+
+  code(text: string, language?: string, containerStyle?: ViewStyle): ReactNode {
+    return <CodeBlock key={this.getKey()} code={text} language={language} containerStyle={containerStyle} />;
   }
 }
 
@@ -55,6 +88,20 @@ export default memo(Markdown);
 /** Platform system monospace — matches the host/port/token fields elsewhere
  * rather than the stylistically-off 'Courier'. */
 const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
+// Chrome around the highlighted code (the token colors come from the hljs style).
+const styles = StyleSheet.create({
+  codeBox: {
+    backgroundColor: theme.color.bg,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginVertical: 4,
+  },
+  codeText: { fontFamily: mono, fontSize: theme.font.mono },
+});
 
 const markedStyles: MarkedStyles = {
   text: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
