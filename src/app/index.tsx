@@ -41,7 +41,10 @@ import {
   type ModelChoice,
   type PickedFile,
   type Session,
+  type ToolEvent,
 } from '@/lib/api';
+import { useTranslation } from 'react-i18next';
+
 import { useDictation } from '@/lib/dictation';
 import type { Pairing } from '@/lib/pairing';
 import { usePairing } from '@/lib/pairing-context';
@@ -54,7 +57,15 @@ import { useSidebar } from '@/lib/sidebar-context';
 type ChatAttachment = { id?: string; uri?: string; name: string; mime?: string };
 
 /** A rendered chat row — a message, any citations, and any attachments. */
-type ChatRow = ChatMessage & { id: string; sources?: ChatSources; attachments?: ChatAttachment[] };
+type ChatRow = ChatMessage & {
+  id: string;
+  sources?: ChatSources;
+  attachments?: ChatAttachment[];
+  /** Live reasoning/extended-thinking text (not persisted to history). */
+  reasoning?: string;
+  /** Agent tool invocations surfaced during this reply. */
+  tools?: ToolEvent[];
+};
 
 /** A file picked into the composer tray, awaiting upload on send. `key` is a
  *  stable list key (the local uri can repeat if the same photo is re-added). */
@@ -456,13 +467,20 @@ export default function ChatScreen() {
     // batches them. A late flush is harmless — updateAssistant is id-guarded, so
     // it no-ops if the row is gone (switched away).
     let buffer = '';
+    let reasonBuffer = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     const flush = () => {
       flushTimer = null;
-      if (!buffer) return;
+      if (!buffer && !reasonBuffer) return;
       const chunk = buffer;
+      const reason = reasonBuffer;
       buffer = '';
-      updateAssistant((cur) => ({ ...cur, content: cur.content + chunk }));
+      reasonBuffer = '';
+      updateAssistant((cur) => ({
+        ...cur,
+        content: cur.content + chunk,
+        reasoning: reason ? (cur.reasoning ?? '') + reason : cur.reasoning,
+      }));
       scrollToEnd();
     };
 
@@ -547,6 +565,14 @@ export default function ChatScreen() {
           onDelta: (delta) => {
             buffer += delta;
             if (!flushTimer) flushTimer = setTimeout(flush, 33);
+          },
+          onThinking: (delta) => {
+            reasonBuffer += delta;
+            if (!flushTimer) flushTimer = setTimeout(flush, 33);
+          },
+          onTool: (evt) => {
+            updateAssistant((cur) => ({ ...cur, tools: [...(cur.tools ?? []), evt] }));
+            scrollToEnd();
           },
           onModel: (model) => {
             // Reflect the model the server actually used in the header.
@@ -916,6 +942,50 @@ function Toggle({
   );
 }
 
+/** Collapsible reasoning ("thinking") block shown above an assistant reply. */
+function ReasoningBlock({ text }: { text: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.reasoning}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        hitSlop={8}
+        style={({ pressed }) => [styles.reasoningHead, pressed && { opacity: 0.6 }]}
+        accessibilityRole="button"
+      >
+        <Text style={styles.reasoningTitle}>{`${open ? '▾' : '▸'} ${t('chat.thinking')}`}</Text>
+      </Pressable>
+      {open ? (
+        <Text style={styles.reasoningText} selectable>
+          {text}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Compact chips for agent tool calls (bash, web_search, …) with exit status. */
+function ToolActivity({ tools }: { tools: ToolEvent[] }) {
+  const { t } = useTranslation();
+  // Collapse start/output pairs to one chip per tool occurrence, latest status wins.
+  return (
+    <View style={styles.toolWrap}>
+      {tools.map((tv, i) => {
+        const failed = typeof tv.exitCode === 'number' && tv.exitCode !== 0;
+        return (
+          <View key={i} style={[styles.toolChip, failed && styles.toolChipFail]}>
+            <Text style={styles.toolLabel} numberOfLines={1}>
+              {`${t('chat.toolCall')}: ${tv.tool}`}
+              {tv.phase === 'output' && typeof tv.exitCode === 'number' ? ` (${tv.exitCode})` : ''}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 /** User messages stay plain; assistant content goes through the markdown renderer. */
 function Bubble({
   message,
@@ -962,13 +1032,15 @@ function Bubble({
             })}
           </View>
         ) : null}
+        {!isUser && message.reasoning ? <ReasoningBlock text={message.reasoning} /> : null}
+        {!isUser && message.tools?.length ? <ToolActivity tools={message.tools} /> : null}
         {isUser ? (
           <Text style={styles.userText} selectable>
             {message.content}
           </Text>
         ) : message.content ? (
           <Markdown text={message.content} />
-        ) : (
+        ) : message.reasoning || message.tools?.length ? null : (
           <Text style={styles.userText}>…</Text>
         )}
         {!isUser && message.sources ? <Sources sources={message.sources} /> : null}
@@ -1110,6 +1182,40 @@ const styles = StyleSheet.create({
   // danger-colored Stop button, and coral-inside-a-danger-box collides with the
   // Two Reds Rule. White-bold keeps the affordance without abutting the reds.
   bannerRetry: { color: theme.color.text, fontSize: theme.font.small, fontWeight: '700' },
+
+  // Collapsible reasoning block + agent tool chips above an assistant reply.
+  reasoning: {
+    marginBottom: theme.space(2),
+    borderLeftWidth: 2,
+    borderLeftColor: theme.color.border,
+    paddingLeft: theme.space(2.5),
+  },
+  reasoningHead: { paddingVertical: theme.space(1) },
+  reasoningTitle: {
+    color: theme.color.textFaint,
+    fontSize: theme.font.small,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reasoningText: {
+    color: theme.color.textDim,
+    fontSize: theme.font.small,
+    lineHeight: 19,
+    fontStyle: 'italic',
+    marginTop: theme.space(1),
+  },
+  toolWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space(1.5), marginBottom: theme.space(2) },
+  toolChip: {
+    paddingHorizontal: theme.space(2.5),
+    paddingVertical: theme.space(1),
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  toolChipFail: { borderColor: theme.color.danger, backgroundColor: theme.color.dangerSurface },
+  toolLabel: { color: theme.color.textDim, fontSize: theme.font.small, fontFamily: 'monospace' },
 
   // Message bubbles (inline, so assistant content can host the markdown view).
   row: { width: '100%', marginVertical: theme.space(1), flexDirection: 'row' },

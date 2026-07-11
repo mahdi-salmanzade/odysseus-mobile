@@ -805,8 +805,24 @@ export function sourcesFromMetadata(metadata: ChatMessage['metadata']): ChatSour
   return out.web || out.rag || out.research || out.memories ? out : undefined;
 }
 
+/** A single agent tool invocation surfaced in the stream. */
+export interface ToolEvent {
+  /** `start` when the tool is invoked, `output` when its result arrives. */
+  phase: 'start' | 'output';
+  /** Tool name (e.g. `bash`, `web_search`). */
+  tool: string;
+  /** The command (on start) or the result text (on output), if any. */
+  text?: string;
+  /** Shell exit code, when the tool reports one. */
+  exitCode?: number;
+}
+
 export interface ChatStreamHandlers {
   onDelta: (text: string) => void;
+  /** Reasoning/extended-thinking tokens (arrive flagged `thinking:true`). */
+  onThinking?: (text: string) => void;
+  /** Agent tool activity (`tool_start` / `tool_output` events). */
+  onTool?: (evt: ToolEvent) => void;
   onDone?: () => void;
   onModel?: (model: string) => void;
   /** Fired once per source event with just that event's slice of sources. */
@@ -987,13 +1003,27 @@ export function streamChat(
       }
       try {
         const evt = JSON.parse(payload);
-        // Reasoning tokens arrive flagged `thinking:true`. The server now keeps
-        // them out of saved history; drop them here too so the live bubble shows
-        // only the final answer (matching what a reloaded conversation shows).
+        // Reasoning tokens arrive flagged `thinking:true`. They're kept out of
+        // saved history, so a reloaded conversation won't show them — but live we
+        // surface them in a collapsible block (falls back to being ignored if the
+        // UI passes no onThinking handler).
         if (typeof evt.delta === 'string') {
-          if (evt.thinking) return;
-          handlers.onDelta(evt.delta);
+          if (evt.thinking) handlers.onThinking?.(evt.delta);
+          else handlers.onDelta(evt.delta);
         }
+        else if (evt.type === 'tool_start')
+          handlers.onTool?.({
+            phase: 'start',
+            tool: String(evt.tool ?? evt.name ?? 'tool'),
+            text: typeof evt.command === 'string' ? evt.command : undefined,
+          });
+        else if (evt.type === 'tool_output')
+          handlers.onTool?.({
+            phase: 'output',
+            tool: String(evt.tool ?? evt.name ?? 'tool'),
+            text: typeof evt.output === 'string' ? evt.output : undefined,
+            exitCode: typeof evt.exit_code === 'number' ? evt.exit_code : undefined,
+          });
         else if (evt.type === 'model_info' && evt.model) handlers.onModel?.(evt.model);
         // Source/citation events — each carries its list under `data`. We hand
         // the UI just this slice; it accumulates across the stream.

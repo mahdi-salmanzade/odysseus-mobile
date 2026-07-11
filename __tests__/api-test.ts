@@ -218,12 +218,16 @@ function sseResponse(chunks: string[]): unknown {
 /** Run streamChat to completion, collecting what the handlers received. */
 function runStream(chunks: string[]): Promise<{
   text: string;
+  thinking: string;
+  tools: { phase: string; tool: string; exitCode?: number }[];
   sources: unknown[];
   error: ApiError | null;
   doneCount: number;
 }> {
   return new Promise((resolve) => {
     let text = '';
+    let thinking = '';
+    const tools: { phase: string; tool: string; exitCode?: number }[] = [];
     const sources: unknown[] = [];
     let error: ApiError | null = null;
     let doneCount = 0;
@@ -236,18 +240,24 @@ function runStream(chunks: string[]): Promise<{
         onDelta: (t) => {
           text += t;
         },
+        onThinking: (t) => {
+          thinking += t;
+        },
+        onTool: (e) => {
+          tools.push({ phase: e.phase, tool: e.tool, exitCode: e.exitCode });
+        },
         onSources: (s) => {
           sources.push(s);
         },
         onError: (e) => {
           error = e;
-          resolve({ text, sources, error, doneCount });
+          resolve({ text, thinking, tools, sources, error, doneCount });
         },
         onDone: () => {
           doneCount += 1;
           // Resolve on the next tick so a double-fire (the bug this guards) would
           // be observed as doneCount > 1 rather than racing the resolve.
-          setImmediate(() => resolve({ text, sources, error, doneCount }));
+          setImmediate(() => resolve({ text, thinking, tools, sources, error, doneCount }));
         },
       },
     );
@@ -267,13 +277,28 @@ describe('streamChat SSE parsing', () => {
     expect(out.error).toBeNull();
   });
 
-  test('skips reasoning tokens flagged thinking:true', async () => {
+  test('surfaces reasoning tokens (thinking:true) separately from the answer', async () => {
     const out = await runStream([
-      'data: {"delta":"reasoning...","thinking":true}\n\n',
+      'data: {"delta":"reason","thinking":true}\n\n',
+      'data: {"delta":"ing","thinking":true}\n\n',
       'data: {"delta":"answer"}\n\n',
       'data: [DONE]\n\n',
     ]);
     expect(out.text).toBe('answer');
+    expect(out.thinking).toBe('reasoning');
+  });
+
+  test('routes tool_start / tool_output events with exit codes', async () => {
+    const out = await runStream([
+      'data: {"type":"tool_start","tool":"bash","command":"ls"}\n\n',
+      'data: {"type":"tool_output","tool":"bash","output":"a b","exit_code":0}\n\n',
+      'data: {"delta":"done"}\n\n',
+      'data: [DONE]\n\n',
+    ]);
+    expect(out.tools).toEqual([
+      { phase: 'start', tool: 'bash', exitCode: undefined },
+      { phase: 'output', tool: 'bash', exitCode: 0 },
+    ]);
   });
 
   test('routes web_sources events and ignores heartbeat comment lines', async () => {
