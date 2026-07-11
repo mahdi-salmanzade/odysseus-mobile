@@ -40,6 +40,7 @@ export default function MemoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [catFilter, setCatFilter] = useState<MemoryCategory | null>(null);
 
   // Composer state.
   const [composing, setComposing] = useState(false);
@@ -142,13 +143,22 @@ export default function MemoryScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return memories;
-    return memories.filter(
-      (m) =>
+    return memories.filter((m) => {
+      if (catFilter && m.category !== catFilter) return false;
+      if (!q) return true;
+      return (
         m.text.toLowerCase().includes(q) ||
-        (m.category ? m.category.toLowerCase().includes(q) : false),
-    );
-  }, [memories, query]);
+        (m.category ? m.category.toLowerCase().includes(q) : false)
+      );
+    });
+  }, [memories, query, catFilter]);
+
+  // Only offer category chips that actually appear in the list, plus "All".
+  const presentCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of memories) if (m.category) set.add(m.category);
+    return MEMORY_CATEGORIES.filter((c) => set.has(c));
+  }, [memories]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -235,6 +245,30 @@ export default function MemoryScreen() {
             clearButtonMode="while-editing"
           />
         </View>
+
+        {presentCategories.length > 0 && (
+          <View style={styles.filterRow}>
+            <Pressable
+              onPress={() => setCatFilter(null)}
+              style={({ pressed }) => [styles.filterChip, !catFilter && styles.filterChipOn, pressed && { opacity: 0.6 }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !catFilter }}
+            >
+              <Text style={[styles.filterChipText, !catFilter && styles.filterChipTextOn]}>All</Text>
+            </Pressable>
+            {presentCategories.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setCatFilter((cur) => (cur === c ? null : c))}
+                style={({ pressed }) => [styles.filterChip, catFilter === c && styles.filterChipOn, pressed && { opacity: 0.6 }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: catFilter === c }}
+              >
+                <Text style={[styles.filterChipText, catFilter === c && styles.filterChipTextOn]}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {loading ? (
           <SkeletonList />
@@ -348,6 +382,24 @@ const styles = StyleSheet.create({
   // (marginBottom 16px), so the search field sits at the same one-gap distance
   // as every other screen instead of being double-spaced.
   searchWrap: { paddingHorizontal: theme.space(5), paddingTop: 0, paddingBottom: theme.space(3) },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space(2),
+    paddingHorizontal: theme.space(5),
+    paddingBottom: theme.space(3),
+  },
+  filterChip: {
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(1.5),
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+  },
+  filterChipOn: { borderColor: theme.color.accent, backgroundColor: theme.color.surfaceAlt },
+  filterChipText: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
+  filterChipTextOn: { color: theme.color.text },
   search: {
     backgroundColor: theme.color.surface,
     borderWidth: 1,
