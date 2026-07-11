@@ -46,6 +46,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { useDictation } from '@/lib/dictation';
+import { useSpeaker, type Speaker } from '@/lib/tts';
 import type { Pairing } from '@/lib/pairing';
 import { usePairing } from '@/lib/pairing-context';
 import { loadModelPref } from '@/lib/prefs';
@@ -144,6 +145,7 @@ export default function ChatScreen() {
   const { pairing, relocate } = usePairing();
   const { openSidebar } = useSidebar();
   const dictation = useDictation();
+  const speaker = useSpeaker();
   // Stable across dictation start/stop, so depending on it doesn't rebuild send().
   const cancelDictation = dictation.cancel;
   // `?session=<id>` (from the Sessions screen) opens an existing conversation;
@@ -747,8 +749,11 @@ export default function ChatScreen() {
           <FlatList
             ref={listRef}
             data={messages}
+            extraData={speaker.speakingId}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <Bubble message={item} onCopy={copyMessage} pairing={pairing} />}
+            renderItem={({ item }) => (
+              <Bubble message={item} onCopy={copyMessage} pairing={pairing} speaker={speaker} />
+            )}
             contentContainerStyle={styles.listContent}
             onScroll={onScroll}
             scrollEventThrottle={100}
@@ -991,11 +996,14 @@ function Bubble({
   message,
   onCopy,
   pairing,
+  speaker,
 }: {
   message: ChatRow;
   onCopy: (content: string) => void;
   pairing: Pairing | null;
+  speaker: Speaker;
 }) {
+  const { t } = useTranslation();
   const isUser = message.role === 'user';
   return (
     <Pressable
@@ -1045,15 +1053,28 @@ function Bubble({
         )}
         {!isUser && message.sources ? <Sources sources={message.sources} /> : null}
         {!isUser && message.content && message.content !== RESEARCHING ? (
-          <Pressable
-            onPress={() => onCopy(message.content)}
-            hitSlop={10}
-            style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Copy message"
-          >
-            <Text style={styles.copyText}>Copy</Text>
-          </Pressable>
+          <View style={styles.msgActions}>
+            <Pressable
+              onPress={() => onCopy(message.content)}
+              hitSlop={10}
+              style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Copy message"
+            >
+              <Text style={styles.copyText}>Copy</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => speaker.toggle(message.id, message.content)}
+              hitSlop={10}
+              style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}
+              accessibilityRole="button"
+              accessibilityLabel={speaker.speakingId === message.id ? t('chat.stopSpeaking') : t('chat.readAloud')}
+            >
+              <Text style={styles.copyText}>
+                {speaker.speakingId === message.id ? t('chat.stopSpeaking') : t('chat.readAloud')}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -1232,6 +1253,7 @@ const styles = StyleSheet.create({
   userText: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
 
   // Discoverable copy on assistant replies; long-press the bubble still works too.
+  msgActions: { flexDirection: 'row', gap: theme.space(4) },
   copyBtn: { alignSelf: 'flex-start', marginTop: theme.space(2), paddingVertical: theme.space(0.5) },
   copyText: {
     color: theme.color.textFaint,
