@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { EdgeSwipe } from '@/components/edge-swipe';
 import { Sidebar } from '@/components/sidebar';
-import { theme } from '@/constants/theme';
+import { theme, isDarkTheme } from '@/constants/theme';
 import { PairingProvider, usePairing } from '@/lib/pairing-context';
 import { setupNotificationTapHandler } from '@/lib/push';
 import { SidebarProvider } from '@/lib/sidebar-context';
@@ -84,7 +84,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PairingProvider>
           <SidebarProvider>
-            <StatusBar style="light" />
+            <StatusBar style={isDarkTheme() ? 'light' : 'dark'} />
             <RootNavigator />
           </SidebarProvider>
         </PairingProvider>

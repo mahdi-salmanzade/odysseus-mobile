@@ -16,7 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { theme } from '@/constants/theme';
+import { theme, themeList, themePreviews as THEME_PREVIEW, applyThemeId } from '@/constants/theme';
+import { reloadApp } from '@/lib/reload';
 import {
   ApiError,
   flattenModels,
@@ -63,6 +64,25 @@ export default function SettingsScreen() {
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ModelPref | null>(null);
   const [testingPush, setTestingPush] = useState(false);
+  const [applyingTheme, setApplyingTheme] = useState<string | null>(null);
+
+  function chooseTheme(id: string) {
+    if (id === theme.id || applyingTheme) return;
+    // Applying swaps the live palette and reloads so every already-mounted
+    // screen restyles; warn since it briefly blanks the app.
+    Alert.alert('Apply theme?', 'The app will reload to apply the new theme.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Apply',
+        onPress: async () => {
+          setApplyingTheme(id);
+          Haptics.selectionAsync().catch(() => {});
+          applyThemeId(id);
+          await reloadApp();
+        },
+      },
+    ]);
+  }
 
   useEffect(() => {
     if (!pairing) return;
@@ -314,6 +334,37 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.group}>
+          <Text style={styles.section}>Appearance</Text>
+          <View style={styles.swatchWrap}>
+            {themeList.map((t) => {
+              const on = t.id === theme.id;
+              const busy = applyingTheme === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  style={({ pressed }) => [styles.swatch, on && styles.swatchOn, pressed && { opacity: 0.7 }]}
+                  onPress={() => chooseTheme(t.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`${t.name} theme`}
+                >
+                  <View style={styles.swatchDots}>
+                    <View style={[styles.swatchDot, { backgroundColor: THEME_PREVIEW[t.id]?.bg }]} />
+                    <View style={[styles.swatchDot, { backgroundColor: THEME_PREVIEW[t.id]?.accent }]} />
+                  </View>
+                  <Text style={[styles.swatchLabel, on && styles.swatchLabelOn]} numberOfLines={1}>
+                    {t.name}
+                  </Text>
+                  {busy && <ActivityIndicator size="small" color={theme.color.accent} />}
+                  {on && !busy && <Text style={styles.check}>✓</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.hint}>Applying a theme reloads the app.</Text>
+        </View>
+
+        <View style={styles.group}>
           <Text style={styles.section}>Notifications</Text>
           <View style={styles.card}>
             <Pressable
@@ -441,6 +492,24 @@ const styles = StyleSheet.create({
   modelLabelOn: { color: theme.color.text, fontWeight: '600' },
   check: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '800' },
   hint: { color: theme.color.textFaint, fontSize: theme.font.small },
+
+  swatchWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space(2) },
+  swatch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space(2),
+    paddingHorizontal: theme.space(3),
+    paddingVertical: theme.space(2.5),
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+  },
+  swatchOn: { borderColor: theme.color.accent },
+  swatchDots: { flexDirection: 'row' },
+  swatchDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: theme.color.border },
+  swatchLabel: { color: theme.color.textDim, fontSize: theme.font.small },
+  swatchLabelOn: { color: theme.color.text, fontWeight: '600' },
 
   danger: { backgroundColor: theme.color.dangerSurface, borderRadius: theme.radius.md, paddingVertical: theme.space(3.5), alignItems: 'center' },
   dangerText: { color: theme.color.danger, fontWeight: '700', fontSize: theme.font.body },
