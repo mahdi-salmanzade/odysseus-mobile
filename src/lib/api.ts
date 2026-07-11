@@ -480,6 +480,22 @@ export async function listTasks(p: Pairing): Promise<Task[]> {
   return listFrom<Task>(res, 'tasks');
 }
 
+/** Control action for a scheduled task, owner-scoped on the server. */
+export type TaskAction = 'pause' | 'resume' | 'run' | 'stop';
+
+/** Run/pause/resume/stop one of the owner's own tasks. Returns the server's
+ *  `{ ok, status, ... }`. Throws ApiError on a non-2xx (e.g. 409 already running). */
+export async function controlTask(
+  p: Pairing,
+  id: string,
+  action: TaskAction,
+): Promise<{ ok: boolean; status?: string }> {
+  const res = await request(p, `/api/companion/tasks/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+  });
+  return json<{ ok: boolean; status?: string }>(res);
+}
+
 export async function listMemories(p: Pairing): Promise<Memory[]> {
   const res = await request(p, '/api/companion/memory');
   return listFrom<Memory>(res, 'memory');
@@ -523,6 +539,15 @@ export async function listGalleryImages(p: Pairing): Promise<GalleryImageItem[]>
   const items = await listFrom<GalleryImageItem>(res, 'items');
   // The server may send numeric ids; coerce to string so keys/route params match.
   return items.map((i) => ({ ...i, id: String(i.id) }));
+}
+
+/** Toggle an image's favorite flag (owner-scoped). Returns the new state. */
+export async function toggleGalleryFavorite(p: Pairing, id: string): Promise<boolean> {
+  const res = await request(p, `/api/companion/gallery/image/${encodeURIComponent(id)}/favorite`, {
+    method: 'POST',
+  });
+  const data = await json<{ favorite?: boolean }>(res);
+  return !!data.favorite;
 }
 
 /**
@@ -1511,6 +1536,35 @@ export async function sendEmail(
   return json<{ status: string; to: string[] }>(res);
 }
 
+/** AI-summarize a message body (the phone already has it from readEmailMessage).
+ *  Runs on the owner's own model endpoint; account ownership asserted server-side. */
+export async function summarizeEmail(
+  p: Pairing,
+  { accountId, subject, body }: { accountId: string; subject: string; body: string },
+): Promise<string> {
+  const res = await request(p, '/api/companion/email/summarize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form({ account_id: accountId, subject, body }),
+  });
+  const data = await json<{ summary?: string }>(res);
+  return data.summary ?? '';
+}
+
+/** Draft an AI reply to a message body. Returns the reply text to prefill the composer. */
+export async function draftEmailReply(
+  p: Pairing,
+  { accountId, subject, originalBody }: { accountId: string; subject: string; originalBody: string },
+): Promise<string> {
+  const res = await request(p, '/api/companion/email/ai-reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form({ account_id: accountId, subject, original_body: originalBody }),
+  });
+  const data = await json<{ reply?: string }>(res);
+  return data.reply ?? '';
+}
+
 // ---------------------------------------------------------------------------
 // Admin tools (companion bridge /api/companion/admin + the admin-gated routes).
 //
@@ -1624,4 +1678,20 @@ export async function getCookbookState(p: Pairing): Promise<Record<string, unkno
   const res = await request(p, '/api/companion/cookbook/state');
   const data = await json<{ state: Record<string, unknown> }>(res);
   return data.state ?? {};
+}
+
+/** One locally-cached model, as reported by the cookbook inventory. */
+export interface CachedModel {
+  repo_id: string;
+  size?: string;
+  status?: string;
+  path?: string;
+  backend?: string;
+}
+
+/** List locally-cached models (admin-gated, read-only browse). Download/serve are
+ *  deliberately not exposed over the LAN companion; this is inventory only. */
+export async function listCachedModels(p: Pairing): Promise<CachedModel[]> {
+  const res = await request(p, '/api/companion/cookbook/models');
+  return listFrom<CachedModel>(res, 'models');
 }
