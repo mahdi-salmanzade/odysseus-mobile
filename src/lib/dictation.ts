@@ -15,6 +15,19 @@ import {
 } from 'expo-speech-recognition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { currentLanguage } from '@/lib/i18n';
+
+/** i18n code → BCP-47 speech-recognition tag. */
+const SPEECH_TAGS: Record<string, string> = {
+  en: 'en-US',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  de: 'de-DE',
+  pt: 'pt-BR',
+  ar: 'ar-SA',
+  fa: 'fa-IR',
+};
+
 /** Join two fragments with a single separating space (and no leading space). */
 function join(a: string, b: string): string {
   if (!a) return b;
@@ -121,6 +134,10 @@ export function useDictation(): Dictation {
     }
   });
 
+  // Dictate in the app's UI language. Map the i18n code to a BCP-47 recognition
+  // tag; unknown codes fall back to en-US.
+  const speechLang = SPEECH_TAGS[currentLanguage()] ?? 'en-US';
+
   useSpeechRecognitionEvent('error', (event) => {
     setRecognizing(false);
     // On-device unavailable for this locale/model — retry once via the cloud
@@ -130,7 +147,7 @@ export function useDictation(): Dictation {
       triedOnDeviceRef.current = false;
       try {
         ExpoSpeechRecognitionModule.start({
-          lang: 'en-US',
+          lang: speechLang,
           interimResults: true,
           continuous: true,
           requiresOnDeviceRecognition: false,
@@ -144,13 +161,13 @@ export function useDictation(): Dictation {
   const begin = useCallback((onDevice: boolean) => {
     triedOnDeviceRef.current = onDevice;
     ExpoSpeechRecognitionModule.start({
-      lang: 'en-US',
+      lang: speechLang,
       interimResults: true,
       // Keep listening across pauses so a multi-sentence message dictates in one go.
       continuous: true,
       requiresOnDeviceRecognition: onDevice,
     });
-  }, []);
+  }, [speechLang]);
 
   const stop = useCallback(() => {
     try {

@@ -16,8 +16,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTranslation } from 'react-i18next';
+
 import { theme, themeList, themePreviews as THEME_PREVIEW, applyThemeId } from '@/constants/theme';
 import { reloadApp } from '@/lib/reload';
+import { languages, currentLanguage, setLanguage } from '@/lib/i18n';
 import {
   ApiError,
   flattenModels,
@@ -50,6 +53,7 @@ const BUILD_NUMBER =
 
 export default function SettingsScreen() {
   const { pairing, unpair, setAddress } = usePairing();
+  const { t } = useTranslation();
   const [info, setInfo] = useState<CompanionInfo | null>(null);
   // Manual "the server's IP changed" editor — updates host/port, keeps the token.
   const [editAddr, setEditAddr] = useState(false);
@@ -65,15 +69,24 @@ export default function SettingsScreen() {
   const [selected, setSelected] = useState<ModelPref | null>(null);
   const [testingPush, setTestingPush] = useState(false);
   const [applyingTheme, setApplyingTheme] = useState<string | null>(null);
+  const activeLang = currentLanguage();
+
+  function chooseLanguage(code: string) {
+    if (code === activeLang) return;
+    Haptics.selectionAsync().catch(() => {});
+    // setLanguage reloads only if it flips text direction (LTR↔RTL); otherwise
+    // it applies live and the screen re-renders via the i18n listener.
+    setLanguage(code);
+  }
 
   function chooseTheme(id: string) {
     if (id === theme.id || applyingTheme) return;
     // Applying swaps the live palette and reloads so every already-mounted
     // screen restyles; warn since it briefly blanks the app.
-    Alert.alert('Apply theme?', 'The app will reload to apply the new theme.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.applyTheme'), t('settings.applyThemePrompt'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Apply',
+        text: t('common.apply'),
         onPress: async () => {
           setApplyingTheme(id);
           Haptics.selectionAsync().catch(() => {});
@@ -175,10 +188,10 @@ export default function SettingsScreen() {
   }
 
   function confirmUnpair() {
-    Alert.alert('Unpair this server?', 'You’ll need to scan the pairing code again to reconnect.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.unpairTitle'), t('settings.unpairPrompt'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Unpair',
+        text: t('settings.unpair'),
         style: 'destructive',
         onPress: async () => {
           // The Stack.Protected guard swaps to the pair screen as soon as
@@ -201,7 +214,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScreenHeader
-        title="Settings"
+        title={t('settings.title')}
         showSettings={false}
         right={
           <Pressable
@@ -211,18 +224,18 @@ export default function SettingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Done"
           >
-            <Text style={styles.close}>Done</Text>
+            <Text style={styles.close}>{t('common.done')}</Text>
           </Pressable>
         }
       />
 
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.group}>
-          <Text style={styles.section}>Connected server</Text>
+          <Text style={styles.section}>{t('settings.connectedServer')}</Text>
           <View style={styles.card}>
             {editAddr ? (
               <View style={styles.editAddr}>
-                <Text style={styles.editLabel}>Server IP / host</Text>
+                <Text style={styles.editLabel}>{t('settings.serverIpHost')}</Text>
                 <TextInput
                   style={styles.input}
                   value={hostIn}
@@ -234,7 +247,7 @@ export default function SettingsScreen() {
                   placeholderTextColor={theme.color.textFaint}
                   accessibilityLabel="Server IP or host"
                 />
-                <Text style={styles.editLabel}>Port</Text>
+                <Text style={styles.editLabel}>{t('settings.port')}</Text>
                 <TextInput
                   style={styles.input}
                   value={portIn}
@@ -261,19 +274,19 @@ export default function SettingsScreen() {
                     {savingAddr ? (
                       <ActivityIndicator color={theme.color.onAccent} />
                     ) : (
-                      <Text style={styles.editSaveText}>Save &amp; reconnect</Text>
+                      <Text style={styles.editSaveText}>{t('settings.saveReconnect')}</Text>
                     )}
                   </Pressable>
                 </View>
               </View>
             ) : (
               <>
-                <Row label="Host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
+                <Row labelKey="settings.host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
                 <Row
-                  label="Server"
-                  value={info ? `${info.name} ${info.version}` : tokenRejected ? 'Token rejected' : '…'}
+                  labelKey="settings.server"
+                  value={info ? `${info.name} ${info.version}` : tokenRejected ? t('settings.tokenRejected') : '…'}
                 />
-                <Row label="Paired as" value={info?.owner ?? '—'} last />
+                <Row labelKey="settings.pairedAs" value={info?.owner ?? '—'} last />
               </>
             )}
           </View>
@@ -284,19 +297,19 @@ export default function SettingsScreen() {
               style={({ pressed }) => pressed && { opacity: 0.6 }}
               accessibilityRole="button"
             >
-              <Text style={styles.changeAddr}>Change server address (IP changed?)</Text>
+              <Text style={styles.changeAddr}>{t('settings.changeAddress')}</Text>
             </Pressable>
           )}
 
           {tokenRejected && (
             <Text style={styles.warn}>
-              This server rejected the pairing token. Unpair and scan a fresh code to reconnect.
+              {t('settings.tokenRejectedHint')}
             </Text>
           )}
         </View>
 
         <View style={styles.group}>
-          <Text style={styles.section}>Model</Text>
+          <Text style={styles.section}>{t('settings.model')}</Text>
           <View style={styles.card}>
             {modelsError ? (
               <Text style={styles.modelError}>{modelsError}</Text>
@@ -305,7 +318,7 @@ export default function SettingsScreen() {
                 <ActivityIndicator color={theme.color.accent} />
               </View>
             ) : models.length === 0 ? (
-              <Text style={styles.modelError}>No models available on this server.</Text>
+              <Text style={styles.modelError}>{t('settings.noModels')}</Text>
             ) : (
               models.map((m, i) => {
                 const on = effective?.endpoint_id === m.endpoint_id && effective?.model === m.model;
@@ -330,11 +343,36 @@ export default function SettingsScreen() {
               })
             )}
           </View>
-          <Text style={styles.hint}>The selected model is used for new chats.</Text>
+          <Text style={styles.hint}>{t('settings.modelHint')}</Text>
         </View>
 
         <View style={styles.group}>
-          <Text style={styles.section}>Appearance</Text>
+          <Text style={styles.section}>{t('settings.language')}</Text>
+          <View style={styles.swatchWrap}>
+            {languages.map((l) => {
+              const on = l.code === activeLang;
+              return (
+                <Pressable
+                  key={l.code}
+                  style={({ pressed }) => [styles.swatch, on && styles.swatchOn, pressed && { opacity: 0.7 }]}
+                  onPress={() => chooseLanguage(l.code)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={l.name}
+                >
+                  <Text style={[styles.swatchLabel, on && styles.swatchLabelOn]} numberOfLines={1}>
+                    {l.name}
+                  </Text>
+                  {on && <Text style={styles.check}>✓</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.hint}>{t('settings.languageHint')}</Text>
+        </View>
+
+        <View style={styles.group}>
+          <Text style={styles.section}>{t('settings.appearance')}</Text>
           <View style={styles.swatchWrap}>
             {themeList.map((t) => {
               const on = t.id === theme.id;
@@ -361,11 +399,11 @@ export default function SettingsScreen() {
               );
             })}
           </View>
-          <Text style={styles.hint}>Applying a theme reloads the app.</Text>
+          <Text style={styles.hint}>{t('settings.themeHint')}</Text>
         </View>
 
         <View style={styles.group}>
-          <Text style={styles.section}>Notifications</Text>
+          <Text style={styles.section}>{t('settings.notifications')}</Text>
           <View style={styles.card}>
             <Pressable
               style={({ pressed }) => [
@@ -377,12 +415,12 @@ export default function SettingsScreen() {
               disabled={testingPush}
               accessibilityRole="button"
             >
-              <Text style={[styles.modelLabel, styles.modelLabelOn]}>Send a test notification</Text>
+              <Text style={[styles.modelLabel, styles.modelLabelOn]}>{t('settings.sendTestNotification')}</Text>
               {testingPush ? <ActivityIndicator color={theme.color.accent} /> : <Text style={styles.check}>→</Text>}
             </Pressable>
           </View>
           <Text style={styles.hint}>
-            Get a push when research finishes or a new memory, note, or document is saved.
+            {t('settings.notificationsHint')}
           </Text>
         </View>
 
@@ -391,30 +429,30 @@ export default function SettingsScreen() {
           onPress={confirmUnpair}
           accessibilityRole="button"
         >
-          <Text style={styles.dangerText}>Unpair</Text>
+          <Text style={styles.dangerText}>{t('settings.unpair')}</Text>
         </Pressable>
 
         <View style={styles.group}>
-          <Text style={styles.section}>App</Text>
+          <Text style={styles.section}>{t('settings.app')}</Text>
           <View style={styles.card}>
-            <Row label="Version" value={`v${APP_VERSION}`} />
-            <Row label="Build" value={BUILD_NUMBER} last />
+            <Row labelKey="settings.version" value={`v${APP_VERSION}`} />
+            <Row labelKey="settings.build" value={BUILD_NUMBER} last />
           </View>
         </View>
 
         <Text style={styles.footnote}>
-          Odysseus Mobile talks to your self-hosted server over your local network. Nothing leaves
-          your network, and the pairing token is stored only on this device.
+          {t('settings.footnote')}
         </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
+function Row({ labelKey, value, last }: { labelKey: string; value: string; last?: boolean }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.row, last && styles.rowLast]}>
-      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowLabel}>{t(labelKey)}</Text>
       <Text style={styles.rowValue} numberOfLines={1}>
         {value}
       </Text>

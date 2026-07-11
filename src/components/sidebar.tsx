@@ -19,6 +19,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useTranslation } from 'react-i18next';
+
 import { NavIcon, type NavIconName } from '@/components/nav-icon';
 import { OdysseusLogo } from '@/components/odysseus-logo';
 import { theme } from '@/constants/theme';
@@ -29,31 +31,32 @@ const PANEL_WIDTH = 288;
 const OPEN_MS = 240;
 const CLOSE_MS = 200;
 
-type NavItem = { icon: NavIconName; label: string; href: Href };
+type NavItem = { icon: NavIconName; labelKey: string; href: Href };
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: 'chat', label: 'New Chat', href: '/' },
-  { icon: 'sessions', label: 'Sessions', href: '/sessions' },
-  { icon: 'notes', label: 'Notes', href: '/notes' },
-  { icon: 'documents', label: 'Documents', href: '/documents' },
-  { icon: 'gallery', label: 'Gallery', href: '/gallery' },
-  { icon: 'tasks', label: 'Tasks', href: '/tasks' },
-  { icon: 'calendar', label: 'Calendar', href: '/calendar' },
-  { icon: 'email', label: 'Email', href: '/email' },
-  { icon: 'presets', label: 'Presets', href: '/presets' },
-  { icon: 'memory', label: 'Memory', href: '/memory' },
-  { icon: 'assistant', label: 'Assistant', href: '/assistant' },
-  { icon: 'skills', label: 'Skills', href: '/skills' },
-  { icon: 'research', label: 'Research', href: '/research' },
-  { icon: 'search', label: 'Search', href: '/search' },
-  { icon: 'compare', label: 'Compare', href: '/compare' },
-  { icon: 'admin', label: 'Admin', href: '/admin' },
-  { icon: 'settings', label: 'Settings', href: '/settings' },
+  { icon: 'chat', labelKey: 'nav.newChat', href: '/' },
+  { icon: 'sessions', labelKey: 'nav.sessions', href: '/sessions' },
+  { icon: 'notes', labelKey: 'nav.notes', href: '/notes' },
+  { icon: 'documents', labelKey: 'nav.documents', href: '/documents' },
+  { icon: 'gallery', labelKey: 'nav.gallery', href: '/gallery' },
+  { icon: 'tasks', labelKey: 'nav.tasks', href: '/tasks' },
+  { icon: 'calendar', labelKey: 'nav.calendar', href: '/calendar' },
+  { icon: 'email', labelKey: 'nav.email', href: '/email' },
+  { icon: 'presets', labelKey: 'nav.presets', href: '/presets' },
+  { icon: 'memory', labelKey: 'nav.memory', href: '/memory' },
+  { icon: 'assistant', labelKey: 'nav.assistant', href: '/assistant' },
+  { icon: 'skills', labelKey: 'nav.skills', href: '/skills' },
+  { icon: 'research', labelKey: 'nav.research', href: '/research' },
+  { icon: 'search', labelKey: 'nav.search', href: '/search' },
+  { icon: 'compare', labelKey: 'nav.compare', href: '/compare' },
+  { icon: 'admin', labelKey: 'nav.admin', href: '/admin' },
+  { icon: 'settings', labelKey: 'nav.settings', href: '/settings' },
 ];
 
 export function Sidebar() {
   const { open, closeSidebar } = useSidebar();
   const { pairing, unpair } = usePairing();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -187,7 +190,7 @@ export function Sidebar() {
                     color={active ? theme.color.accent : theme.color.textFaint}
                   />
                   <Text style={[styles.navLabel, active && styles.navLabelActive]}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </Text>
                 </Pressable>
               );
