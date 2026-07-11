@@ -48,6 +48,25 @@ then chat quality (reasoning/tools, highlighting, TTS), then the independent
 screen features (memory, tasks, gallery, email, cookbook). One focused commit per
 item; `tsc` + `jest` green before each.
 
+## Status (2026-07-11)
+
+Shipped client-only: themes (12), i18n+RTL (7 langs), reasoning/tool-use in chat,
+code syntax highlighting, TTS read-aloud, memory category filter.
+
+Shipped with new owner-scoped companion-bridge endpoints (server + client):
+task run/pause/resume/stop, gallery favorite toggle, email AI summarize + reply,
+cookbook read-only model browse. Server endpoints re-resolve the real token owner
+(never the `api` pseudo-user) with strict cross-owner 404s; 11 regression tests.
+
+**Deliberately not exposed over the LAN companion:** cookbook model *download* and
+*serve*. `serve` runs an operator-supplied shell command on the host (optionally
+over SSH) — the exact surface the threat model keeps off the bridge. Browsing the
+model inventory is safe; launching stays a desktop/admin-console action.
+
+**Deferred (needs a server endpoint):** memory pin — the bridge has no owner-scoped
+memory-pin route (only notes), so it needs a companion endpoint rather than the
+un-scoped stock route.
+
 ## Deliberately NOT copying
 
 The competitor stores an **admin session cookie** on the phone and ships a 550 MB

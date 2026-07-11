@@ -35,10 +35,12 @@ import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
 import {
   ApiError,
+  draftEmailReply,
   listEmailAccounts,
   listEmailMessages,
   readEmailMessage,
   sendEmail,
+  summarizeEmail,
   type EmailAccount,
   type EmailHeader,
   type EmailMessage,
@@ -78,6 +80,11 @@ export default function EmailScreen() {
   const [detail, setDetail] = useState<EmailMessage | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  // AI actions on the opened message (owner's own model endpoint, server-side).
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [aiReplying, setAiReplying] = useState(false);
 
   // Compose modal state.
   const [composing, setComposing] = useState(false);
@@ -194,7 +201,59 @@ export default function EmailScreen() {
     setDetail(null);
     setDetailError(null);
     setDetailLoading(false);
+    setSummary(null);
+    setSummarizing(false);
+    setAiReplying(false);
   }, []);
+
+  // Summarize the open message via the owner's model endpoint (server-side LLM).
+  const doSummarize = useCallback(async () => {
+    if (!pairing || !activeId || !detail || summarizing) return;
+    setSummarizing(true);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const text = await summarizeEmail(pairing, {
+        accountId: activeId,
+        subject: detail.subject || '',
+        body: detail.body || '',
+      });
+      if (!mounted.current) return;
+      setSummary(text || 'No summary returned.');
+    } catch (e) {
+      if (!mounted.current) return;
+      Alert.alert('Could not summarize', friendlyError(e, 'Something went wrong.'));
+    } finally {
+      if (mounted.current) setSummarizing(false);
+    }
+  }, [pairing, activeId, detail, summarizing]);
+
+  // Draft an AI reply, then open the composer prefilled with it.
+  const doAiReply = useCallback(async () => {
+    if (!pairing || !activeId || !detail || aiReplying) return;
+    setAiReplying(true);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const reply = await draftEmailReply(pairing, {
+        accountId: activeId,
+        subject: detail.subject || '',
+        originalBody: detail.body || '',
+      });
+      if (!mounted.current) return;
+      const sender = detail.from || '';
+      const subj = detail.subject || '';
+      closeMessage();
+      setTo(sender);
+      setSubject(subj.toLowerCase().startsWith('re:') ? subj : `Re: ${subj}`);
+      setBody(reply);
+      setSendError(null);
+      setComposing(true);
+    } catch (e) {
+      if (!mounted.current) return;
+      Alert.alert('Could not draft a reply', friendlyError(e, 'Something went wrong.'));
+    } finally {
+      if (mounted.current) setAiReplying(false);
+    }
+  }, [pairing, activeId, detail, aiReplying, closeMessage]);
 
   const copySubject = useCallback(async (text: string) => {
     if (!text) return;
@@ -374,6 +433,47 @@ export default function EmailScreen() {
                   <Text style={styles.readMetaLine}>{dateOnly(detail.date)}</Text>
                 )}
               </View>
+              <View style={styles.aiRow}>
+                <Pressable
+                  onPress={doSummarize}
+                  disabled={summarizing || aiReplying}
+                  style={({ pressed }) => [styles.aiBtn, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Summarize message"
+                >
+                  {summarizing ? (
+                    <ActivityIndicator color={theme.color.accent} size="small" />
+                  ) : (
+                    <Text style={styles.aiBtnText}>Summarize</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={doAiReply}
+                  disabled={summarizing || aiReplying}
+                  style={({ pressed }) => [styles.aiBtn, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Draft an AI reply"
+                >
+                  {aiReplying ? (
+                    <ActivityIndicator color={theme.color.accent} size="small" />
+                  ) : (
+                    <Text style={styles.aiBtnText}>AI Reply</Text>
+                  )}
+                </Pressable>
+              </View>
+              {summary !== null && (
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryHead}>
+                    <Text style={styles.summaryLabel}>Summary</Text>
+                    <Pressable onPress={() => setSummary(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss summary">
+                      <Text style={styles.summaryClose}>×</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.summaryText} selectable>
+                    {summary}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.readText} selectable>
                 {detail.body}
               </Text>
@@ -563,6 +663,38 @@ const styles = StyleSheet.create({
   },
   readMetaLine: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 18 },
   readText: { color: theme.color.textDim, fontSize: theme.font.body, lineHeight: 22 },
+
+  aiRow: { flexDirection: 'row', gap: theme.space(2.5) },
+  aiBtn: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.space(2.5),
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  aiBtnText: { color: theme.color.accent, fontSize: theme.font.small, fontWeight: '700' },
+  summaryCard: {
+    backgroundColor: theme.color.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    padding: theme.space(3.5),
+    gap: theme.space(2),
+  },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  summaryLabel: {
+    color: theme.color.textFaint,
+    fontSize: theme.font.small,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  summaryClose: { color: theme.color.textFaint, fontSize: 22, lineHeight: 22 },
+  summaryText: { color: theme.color.text, fontSize: theme.font.body, lineHeight: 21 },
 
   composeBody: { padding: theme.space(4), gap: theme.space(3) },
   field: {

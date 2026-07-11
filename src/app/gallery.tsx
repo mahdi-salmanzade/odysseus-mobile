@@ -5,12 +5,13 @@
  * and requires auth), so thumbnails use the authenticated source built by
  * api.imageSource rather than a plain uri. Tapping a thumbnail opens a modal
  * showing the image fit-to-screen plus its prompt (selectable) and dim meta
- * (model · date) and a ★ when favorited (display only — no toggle endpoint).
+ * (model · date) and a ★ that toggles the owner-scoped favorite flag.
  * Pull-to-refresh, plus empty/error/loading states.
  */
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -29,7 +30,13 @@ import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { SkeletonGrid } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
-import { ApiError, imageSource, listGalleryImages, type GalleryImageItem } from '@/lib/api';
+import {
+  ApiError,
+  imageSource,
+  listGalleryImages,
+  toggleGalleryFavorite,
+  type GalleryImageItem,
+} from '@/lib/api';
 import { usePairing } from '@/lib/pairing-context';
 import { useSidebar } from '@/lib/sidebar-context';
 
@@ -52,13 +59,40 @@ export default function GalleryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // The image currently open in the fullscreen viewer (null = closed).
-  const [open, setOpen] = useState<GalleryImageItem | null>(null);
+  // The id of the image open in the fullscreen viewer (null = closed). We key by
+  // id (not the object) so the viewer reflects favorite toggles applied to the
+  // backing `images` array.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = openId !== null ? (images.find((i) => i.id === openId) ?? null) : null;
+
+  // Ids with a favorite toggle in flight — guards double-taps.
+  const [pendingFav, setPendingFav] = useState<Set<string>>(new Set());
 
   // Once loaded, refocus refreshes silently instead of blanking to a spinner.
   const loadedOnce = useRef(false);
   // Guard against setting state after the screen blurs / unmounts mid-fetch.
   const cancelled = useRef(false);
+
+  const toggleFavorite = useCallback(
+    async (item: GalleryImageItem) => {
+      if (!pairing || pendingFav.has(item.id)) return;
+      setPendingFav((prev) => new Set(prev).add(item.id));
+      try {
+        const next = await toggleGalleryFavorite(pairing, item.id);
+        Haptics.selectionAsync().catch(() => {});
+        setImages((prev) => prev.map((i) => (i.id === item.id ? { ...i, favorite: next } : i)));
+      } catch (e) {
+        Alert.alert('Could not update favorite', e instanceof ApiError ? e.message : 'Something went wrong.');
+      } finally {
+        setPendingFav((prev) => {
+          const nextSet = new Set(prev);
+          nextSet.delete(item.id);
+          return nextSet;
+        });
+      }
+    },
+    [pairing, pendingFav],
+  );
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
@@ -141,7 +175,7 @@ export default function GalleryScreen() {
               size={tileSize}
               onOpen={() => {
                 Haptics.selectionAsync().catch(() => {});
-                setOpen(item);
+                setOpenId(item.id);
               }}
             />
           )}
@@ -152,10 +186,17 @@ export default function GalleryScreen() {
         visible={open !== null}
         animationType="fade"
         transparent={false}
-        onRequestClose={() => setOpen(null)}
+        onRequestClose={() => setOpenId(null)}
         statusBarTranslucent
       >
-        {open ? <Viewer item={open} onClose={() => setOpen(null)} /> : null}
+        {open ? (
+          <Viewer
+            item={open}
+            onClose={() => setOpenId(null)}
+            onToggleFavorite={() => toggleFavorite(open)}
+            favPending={pendingFav.has(open.id)}
+          />
+        ) : null}
       </Modal>
     </SafeAreaView>
   );
@@ -203,7 +244,17 @@ function Thumbnail({
 }
 
 /** Fullscreen viewer: image fit to screen + prompt caption and dim meta. */
-function Viewer({ item, onClose }: { item: GalleryImageItem; onClose: () => void }) {
+function Viewer({
+  item,
+  onClose,
+  onToggleFavorite,
+  favPending,
+}: {
+  item: GalleryImageItem;
+  onClose: () => void;
+  onToggleFavorite: () => void;
+  favPending: boolean;
+}) {
   const { pairing } = usePairing();
   const [failed, setFailed] = useState(false);
   if (!pairing) return null;
@@ -213,13 +264,19 @@ function Viewer({ item, onClose }: { item: GalleryImageItem; onClose: () => void
   return (
     <SafeAreaView style={styles.viewerSafe} edges={['top', 'bottom']}>
       <View style={styles.viewerBar}>
-        {item.favorite ? (
-          <Text style={styles.viewerStar} accessibilityLabel="Favorited">
-            ★
+        <Pressable
+          onPress={onToggleFavorite}
+          disabled={favPending}
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+          style={({ pressed }) => [styles.viewerBarSlot, styles.viewerStarSlot, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel={item.favorite ? 'Remove from favorites' : 'Add to favorites'}
+          accessibilityState={{ selected: item.favorite, disabled: favPending }}
+        >
+          <Text style={[styles.viewerStar, !item.favorite && styles.viewerStarOff]}>
+            {item.favorite ? '★' : '☆'}
           </Text>
-        ) : (
-          <View style={styles.viewerBarSlot} />
-        )}
+        </Pressable>
         <Pressable
           onPress={onClose}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
@@ -306,7 +363,9 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space(3),
   },
   viewerBarSlot: { minWidth: 44, height: 28, alignItems: 'flex-end', justifyContent: 'center' },
+  viewerStarSlot: { alignItems: 'flex-start' },
   viewerStar: { color: theme.color.accent, fontSize: theme.font.title },
+  viewerStarOff: { color: theme.color.textFaint },
   closeText: { color: theme.color.accent, fontSize: theme.font.body, fontWeight: '600' },
 
   viewerImageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },

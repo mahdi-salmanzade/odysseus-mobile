@@ -34,11 +34,13 @@ import {
   getAdminStatus,
   getCookbookState,
   getVaultStatus,
+  listCachedModels,
   listContacts,
   listMcpServers,
   runCommand,
   unlockVault,
   type AdminStatus,
+  type CachedModel,
   type Contact,
   type McpServer,
   type TerminalResult,
@@ -678,6 +680,8 @@ function CookbookSection() {
   const { pairing } = usePairing();
 
   const [state, setState] = useState<Record<string, unknown> | null>(null);
+  const [models, setModels] = useState<CachedModel[] | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -687,16 +691,27 @@ function CookbookSection() {
     if (!pairing) return;
     setLoading(true);
     setError(null);
-    try {
-      const s = await getCookbookState(pairing);
-      if (cancelled.current) return;
-      setState(s);
-    } catch (e) {
-      if (cancelled.current) return;
+    setModelsError(null);
+    // Load the state and the cached-model inventory in parallel. The models list
+    // is a separate, non-fatal concern — if only it fails, still show the state.
+    const [stateRes, modelsRes] = await Promise.allSettled([
+      getCookbookState(pairing),
+      listCachedModels(pairing),
+    ]);
+    if (cancelled.current) return;
+    if (stateRes.status === 'fulfilled') {
+      setState(stateRes.value);
+    } else {
+      const e = stateRes.reason;
       setError(e instanceof ApiError ? e.message : 'Could not load the cookbook state.');
-    } finally {
-      if (!cancelled.current) setLoading(false);
     }
+    if (modelsRes.status === 'fulfilled') {
+      setModels(modelsRes.value);
+    } else {
+      const e = modelsRes.reason;
+      setModelsError(e instanceof ApiError ? e.message : 'Could not list cached models.');
+    }
+    setLoading(false);
   }, [pairing]);
 
   useFocusEffect(
@@ -716,6 +731,7 @@ function CookbookSection() {
       </View>
     );
   }
+  // Only a full state failure blocks the view; a models-only failure is inline.
   if (error) {
     return (
       <View style={styles.center}>
@@ -736,6 +752,28 @@ function CookbookSection() {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.outputWrap}>
+      <Text style={styles.sectionLabel}>Cached models</Text>
+      {modelsError ? (
+        <Text style={styles.inlineError}>{modelsError}</Text>
+      ) : !models || models.length === 0 ? (
+        <Text style={styles.emptyHint}>No cached models.</Text>
+      ) : (
+        <View style={styles.modelList}>
+          {models.map((m, i) => {
+            const meta = [m.size, m.backend, m.status].filter(Boolean).join(' · ');
+            return (
+              <View key={`${m.repo_id}-${i}`} style={styles.card}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {m.repo_id}
+                </Text>
+                {meta ? <Text style={styles.cardFaint}>{meta}</Text> : null}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      <Text style={[styles.sectionLabel, styles.sectionLabelGap]}>State</Text>
       {empty ? (
         <Text style={styles.emptyHint}>The cookbook state is empty.</Text>
       ) : (
@@ -865,6 +903,15 @@ const styles = StyleSheet.create({
 
   // Terminal output.
   outputWrap: { padding: theme.space(4), paddingBottom: theme.space(8), gap: theme.space(2) },
+  sectionLabel: {
+    color: theme.color.textFaint,
+    fontSize: theme.font.small,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionLabelGap: { marginTop: theme.space(4) },
+  modelList: { gap: theme.space(2) },
   exitRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space(2) },
   label: { color: theme.color.textFaint, fontSize: theme.font.small, fontWeight: '600' },
   exitCode: { color: theme.color.ok, fontSize: theme.font.body, fontWeight: '700' },

@@ -1,6 +1,9 @@
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -14,7 +17,8 @@ import { NavIcon } from '@/components/nav-icon';
 import { ScreenHeader } from '@/components/screen-header';
 import { SkeletonList } from '@/components/skeleton';
 import { theme } from '@/constants/theme';
-import { ApiError, listTasks, type Task } from '@/lib/api';
+import { ApiError, controlTask, listTasks, type Task, type TaskAction } from '@/lib/api';
+import type { Pairing } from '@/lib/pairing';
 import { usePairing } from '@/lib/pairing-context';
 import { useSidebar } from '@/lib/sidebar-context';
 
@@ -56,6 +60,26 @@ export default function TasksScreen() {
     }, [load]),
   );
 
+  // Tasks with an in-flight control action, so their row can disable + spin.
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+
+  const control = useCallback(
+    async (task: Task, action: TaskAction) => {
+      if (!pairing || busy[task.id]) return;
+      setBusy((b) => ({ ...b, [task.id]: true }));
+      try {
+        await controlTask(pairing, task.id, action);
+        Haptics.selectionAsync().catch(() => {});
+        await load('refresh');
+      } catch (e) {
+        Alert.alert('Task', e instanceof ApiError ? e.message : 'Could not update the task.');
+      } finally {
+        setBusy((b) => ({ ...b, [task.id]: false }));
+      }
+    },
+    [pairing, busy, load],
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader title="Tasks" onMenu={openSidebar} />
@@ -93,14 +117,24 @@ export default function TasksScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => <TaskRow task={item} />}
+          renderItem={({ item }) => (
+            <TaskRow task={item} busy={!!busy[item.id]} onControl={control} />
+          )}
         />
       )}
     </SafeAreaView>
   );
 }
 
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({
+  task,
+  busy,
+  onControl,
+}: {
+  task: Task;
+  busy: boolean;
+  onControl: (task: Task, action: TaskAction) => void;
+}) {
   const enabled = task.enabled !== false;
   return (
     <View style={styles.card}>
@@ -132,7 +166,49 @@ function TaskRow({ task }: { task: Task }) {
           </Text>
         </View>
       ) : null}
+
+      <View style={styles.actions}>
+        {busy ? (
+          <ActivityIndicator size="small" color={theme.color.textDim} style={styles.actionSpinner} />
+        ) : (
+          <>
+            <ActionButton label="Run" primary disabled={busy} onPress={() => onControl(task, 'run')} />
+            {enabled ? (
+              <ActionButton label="Pause" disabled={busy} onPress={() => onControl(task, 'pause')} />
+            ) : (
+              <ActionButton label="Resume" disabled={busy} onPress={() => onControl(task, 'resume')} />
+            )}
+            <ActionButton label="Stop" disabled={busy} onPress={() => onControl(task, 'stop')} />
+          </>
+        )}
+      </View>
     </View>
+  );
+}
+
+function ActionButton({
+  label,
+  onPress,
+  primary,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.action,
+        primary && styles.actionPrimary,
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Text style={[styles.actionText, primary && styles.actionTextPrimary]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -180,6 +256,25 @@ const styles = StyleSheet.create({
   pillText: { fontSize: theme.font.small, fontWeight: '700' },
   pillTextOn: { color: theme.color.ok },
   pillTextOff: { color: theme.color.textFaint },
+
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space(2),
+    marginTop: theme.space(1),
+  },
+  actionSpinner: { paddingVertical: theme.space(1.5) },
+  action: {
+    paddingHorizontal: theme.space(3.5),
+    paddingVertical: theme.space(1.5),
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  actionPrimary: { borderColor: theme.color.accent },
+  actionText: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
+  actionTextPrimary: { color: theme.color.accent },
 
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space(3) },
   metaLabel: {
