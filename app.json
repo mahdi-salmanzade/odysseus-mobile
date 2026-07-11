@@ -85,7 +85,6 @@
           }
         }
       ],
-      "expo-speech-recognition",
       "expo-localization"
     ],
     "experiments": {
