@@ -4,7 +4,7 @@
 
 # Odysseus Mobile
 
-**Version 1.0.0**
+**Version 1.0.0 · Build 11**
 
 A native iOS/Android remote for [**Odysseus**](https://github.com/pewdiepie-archdaemon/odysseus),
 the self-hosted AI workspace. Run Odysseus on a machine at home, pair your phone
@@ -39,19 +39,38 @@ gets the full app, not a stretched phone view. (iPad screenshots:
 1. Install Apple's **[TestFlight](https://apps.apple.com/app/testflight/id899247664)** app.
 2. Open **[testflight.apple.com/join/qWq1A51n](https://testflight.apple.com/join/qWq1A51n)** and tap *Install*.
 
-The **latest build (build 10)** is live on TestFlight. Please give it a spin and
+The **latest build (build 11)** is live on TestFlight. Please give it a spin and
 send feedback — bugs, rough edges, anything — via the
 [issues](https://github.com/mahdi-salmanzade/odysseus-mobile/issues) or
 TestFlight's built-in feedback.
 
 ### Android — APK
 
-Download **[`odysseus-mobile-v1.0.0-build10.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/latest)**
-from the latest release and install it (allow *install from unknown sources* if
-prompted).
+Download **[`odysseus-mobile-v1.0.0-build11.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/download/v1.0.0-build.11/odysseus-mobile-v1.0.0-build11.apk)**
+from the [Build 11 release](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/tag/v1.0.0-build.11)
+and install it (allow *install from unknown sources* if prompted).
 
 > Either way, you'll need an Odysseus server on your LAN with the companion
 > bridge — see [Prerequisites](#prerequisites) and [Pairing](#pairing) below.
+
+## What's new in Build 11
+
+- **12 themes, including light modes** — choose one in **Settings → Appearance**.
+- **Seven languages** — English, Spanish, French, German, Portuguese, Arabic,
+  and Persian, with device-language detection and right-to-left layout.
+- **Richer chat** — view assistant thinking in a collapsible block, follow agent
+  tool calls, and read syntax-highlighted code blocks.
+- **Read aloud and multilingual dictation** — hear assistant replies using
+  on-device text-to-speech, and dictate in the selected language.
+- **Task controls** — run, pause, resume, or stop scheduled tasks from the app.
+- **Gallery favorites** — add or remove a favorite from the image viewer.
+- **Email AI** — summarize a message or draft a reply with your own model.
+- **Cached model browser** — inspect the server's model inventory from
+  **Admin → Cookbook**.
+
+All of these features remain owner-scoped and local-first: the app communicates
+only with the Odysseus server you paired over your network. See the full
+[changelog](CHANGELOG.md) for release details.
 
 ## A note to the community (and to PewDiePie) 🙏
 
@@ -135,19 +154,28 @@ src/
     index.tsx       # chat screen (model discovery, session, SSE streaming)
     sessions.tsx    # session list
     notes.tsx       # notes (text + checklists)
-    tasks.tsx       # scheduled tasks
-    memory.tsx      # memories
+    documents.tsx   # document library
+    gallery.tsx     # image gallery + favorites
+    tasks.tsx       # scheduled tasks + run/pause/resume/stop
+    calendar.tsx    # calendar and event creation
+    email.tsx       # multi-account email + AI summarize/reply
+    memory.tsx      # memories + category filtering
+    admin.tsx       # terminal, contacts, vault, MCP, cookbook models
     pair.tsx        # QR scan / manual pairing
-    settings.tsx    # server info + unpair
+    settings.tsx    # server, model, language, theme, push + unpair
   components/        # sidebar, markdown, qr-scanner, header-icons,
                      # nav-icon, odysseus-logo, odysseus-wordmark
   lib/
     api.ts          # Odysseus wire contract + SSE stream reader
+    i18n/           # 7 translated locale bundles + RTL setup
+    tts.ts          # on-device assistant read-aloud
+    dictation.ts    # multilingual speech recognition
+    device-prefs.ts # synchronous theme/language persistence
     pairing.ts      # Pairing type + secure-store persistence
     pairing-context.tsx
     sidebar-context.tsx
     prefs.ts        # persisted user prefs (e.g. selected model)
-  constants/theme.ts
+  constants/theme.ts # 12 selectable color palettes
 ```
 
 ## Permissions
@@ -161,6 +189,9 @@ The app declares only what it needs, each with a clear purpose string:
 - **Microphone** + **Speech Recognition** — optional on-device speech-to-text
   for composing a message by voice.
 - **Local Network** — reach your Odysseus server over the LAN.
+
+Read-aloud uses the operating system's text-to-speech voices and requires no
+additional permission.
 
 None of these send data anywhere but your own server. You can decline any of them
 and still pair manually and chat by typing.
