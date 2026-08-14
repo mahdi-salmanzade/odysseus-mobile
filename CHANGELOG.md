@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Build 12 — 2026-08-14
 
 ### Remote access over HTTPS
 

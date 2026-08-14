@@ -4,7 +4,7 @@
 
 # Odysseus Mobile
 
-**Version 1.0.0 · Build 11**
+**Version 1.0.0 · Build 12**
 
 A native iOS/Android remote for [**Odysseus**](https://github.com/pewdiepie-archdaemon/odysseus),
 the self-hosted AI workspace. Run Odysseus on a machine at home, pair your phone
@@ -39,19 +39,30 @@ gets the full app, not a stretched phone view. (iPad screenshots:
 1. Install Apple's **[TestFlight](https://apps.apple.com/app/testflight/id899247664)** app.
 2. Open **[testflight.apple.com/join/qWq1A51n](https://testflight.apple.com/join/qWq1A51n)** and tap *Install*.
 
-The **latest build (build 11)** is live on TestFlight. Please give it a spin and
+The **latest build (build 12)** is live on TestFlight. Please give it a spin and
 send feedback — bugs, rough edges, anything — via the
 [issues](https://github.com/mahdi-salmanzade/odysseus-mobile/issues) or
 TestFlight's built-in feedback.
 
 ### Android — APK
 
-Download **[`odysseus-mobile-v1.0.0-build11.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/download/v1.0.0-build.11/odysseus-mobile-v1.0.0-build11.apk)**
-from the [Build 11 release](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/tag/v1.0.0-build.11)
+Download **[`odysseus-mobile-v1.0.0-build12.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/download/v1.0.0-build.12/odysseus-mobile-v1.0.0-build12.apk)**
+from the [Build 12 release](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/tag/v1.0.0-build.12)
 and install it (allow *install from unknown sources* if prompted).
 
 > Either way, you'll need an Odysseus server on your LAN with the companion
 > bridge — see [Prerequisites](#prerequisites) and [Pairing](#pairing) below.
+
+## What's new in Build 12
+
+- **Reach your server from anywhere** — pair over **HTTPS** to an Odysseus behind
+  a TLS reverse proxy (`tailscale serve`, Caddy, nginx), instead of only over the
+  same Wi-Fi. Turn on *Use HTTPS* when pairing, or just paste an `https://…`
+  address. See [Remote access](#remote-access-tailscale-wireguard-reverse-proxy).
+  Reported in [#2](https://github.com/mahdi-salmanzade/odysseus-mobile/issues/2)
+  by [@FUenal](https://github.com/FUenal) — thank you.
+- **Clearer setup docs** — the README now says which companion-bridge branch
+  provides which `/api/companion/*` endpoints, and which two aren't published yet.
 
 ## What's new in Build 11
 
