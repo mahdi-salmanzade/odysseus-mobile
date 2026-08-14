@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Remote access over HTTPS
+
+- Added an **Use HTTPS** option to pairing, so a server behind a TLS reverse
+  proxy (`tailscale serve`, Caddy, nginx) can be paired and used. Pasting a full
+  `https://…` address into the host field turns it on automatically, and the
+  scheme is carried through every request, including SSE streaming and uploads.
+  This is what makes the app usable over Tailscale/WireGuard: iOS App Transport
+  Security exempts only local addresses, and its exception list is keyed by
+  domain — a CGNAT range like `100.64.0.0/10` can't be expressed — so cleartext
+  to a tailnet IP never left the device. ([#2](https://github.com/mahdi-salmanzade/odysseus-mobile/issues/2))
+- Kept the cleartext contract unchanged: `http://` pairings are still restricted
+  to LAN/loopback/link-local/CGNAT/`.local`/single-label hosts. An https pairing
+  may name any host, and a scanned code pointing outside the local network now
+  asks for confirmation before the token is sent.
+- Skipped the LAN subnet sweep for https pairings — the host is a name, not a
+  DHCP lease, so rediscovery could only have pointed it at the wrong machine.
+- Switched the host fields to the URL keyboard; the numeric one couldn't type a
+  hostname at all, which the mDNS/MagicDNS advice depended on.
+- Added a pairing hint: on Tailscale, use the machine name rather than the
+  `100.x.y.z` literal when staying on cleartext.
+- Documented in the README which companion-bridge branches provide which
+  `/api/companion/*` endpoints, and which two the app calls that aren't
+  published yet.
+
 ## Build 11 — 2026-07-11
 
 Build 11 is a major feature update.

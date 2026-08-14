@@ -2,12 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -18,10 +20,13 @@ import { OdysseusLogo } from '@/components/odysseus-logo';
 import { QrScanner } from '@/components/qr-scanner';
 import { theme } from '@/constants/theme';
 import { ApiError, ping } from '@/lib/api';
-import { manualPairing, parsePairingPayload, type Pairing } from '@/lib/pairing';
+import { isLanHost, manualPairing, parsePairingPayload, type Pairing } from '@/lib/pairing';
 import { usePairing } from '@/lib/pairing-context';
 
 type Mode = 'scan' | 'manual';
+
+const LAN_PORT = '7000';
+const TLS_PORT = '443';
 
 const ODYSSEUS_REPO = 'https://github.com/pewdiepie-archdaemon/odysseus';
 
@@ -33,14 +38,42 @@ export default function PairScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [host, setHost] = useState('');
-  const [port, setPort] = useState('7000');
+  const [port, setPort] = useState(LAN_PORT);
   const [token, setToken] = useState('');
+  const [tls, setTls] = useState(false);
 
   // Clear any stale error when flipping tabs — a manual-entry failure shouldn't
   // linger over the scanner (and vice versa).
   function switchMode(next: Mode) {
     setError(null);
     setMode(next);
+  }
+
+  // HTTPS servers are almost always fronted on 443 by the reverse proxy, plain
+  // LAN ones on Odysseus's own 7000 — move the port with the toggle, but only
+  // while it's still the untouched default so we never clobber a typed value.
+  function toggleTls(next: boolean) {
+    setTls(next);
+    if (next && port.trim() === LAN_PORT) setPort(TLS_PORT);
+    if (!next && port.trim() === TLS_PORT) setPort(LAN_PORT);
+  }
+
+  /** A code pointing off-LAN is legitimate (Tailscale, reverse proxy) but worth
+   *  one look before the token starts flying to it, since a scanned QR is
+   *  untrusted input and the host isn't one the user typed. */
+  function confirmRemote(p: Pairing): Promise<boolean> {
+    if (isLanHost(p.host)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Connect to a remote server?',
+        `This code points at ${p.host}:${p.port} over HTTPS — outside your local network. Continue only if that's your own Odysseus.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Connect', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      );
+    });
   }
 
   async function tryPair(candidate: Pairing | null) {
@@ -50,8 +83,11 @@ export default function PairScreen() {
       return;
     }
     setError(null);
+    // Go busy *before* the confirmation prompt: it pauses the scanner, so a QR
+    // still in frame can't stack a second alert behind the first.
     setBusy(true);
     try {
+      if (mode === 'scan' && !(await confirmRemote(candidate))) return;
       const res = await ping(candidate);
       // Reached the server but it didn't return ok — distinct from "couldn't
       // reach it at all", so give it its own message rather than the network one.
@@ -76,9 +112,9 @@ export default function PairScreen() {
             <Text style={styles.title}>Set up Odysseus</Text>
           </View>
           <Text style={styles.subtitle}>
-            This app is a LAN remote for{' '}
-            <Text style={styles.bold}>Odysseus</Text>, the self-hosted AI workspace. Run
-            the server on a machine at home, then pair your phone over the same Wi-Fi.
+            This app is a remote for <Text style={styles.bold}>Odysseus</Text>, the
+            self-hosted AI workspace. Run the server on a machine at home, then pair your
+            phone over the same Wi-Fi — or over HTTPS from anywhere.
           </Text>
 
           <Step
@@ -106,12 +142,20 @@ export default function PairScreen() {
             title="Add the companion bridge"
             body={
               <>
-                The mobile pairing endpoints live in{' '}
-                <Text style={styles.mono}>companion/</Text>. Keep{' '}
-                <Text style={styles.mono}>AUTH_ENABLED=true</Text>, since the bridge is
-                exposed on your local network.
+                Upstream ships only part of <Text style={styles.mono}>/api/companion/*</Text>{' '}
+                (ping, info, models, pair). The rest lives in the fork below — the app’s
+                README says which branch to merge. Keep{' '}
+                <Text style={styles.mono}>AUTH_ENABLED=true</Text>; the bridge is exposed on
+                your network.
               </>
             }
+          />
+          <CodeBlock
+            lines={[
+              'git remote add companion \\',
+              '  github.com/mahdi-salmanzade/odysseus',
+              'git fetch companion',
+            ]}
           />
 
           <Step
@@ -131,7 +175,9 @@ export default function PairScreen() {
             body={
               <>
                 Make sure your phone is on the <Text style={styles.bold}>same Wi-Fi</Text>,
-                then scan the QR or enter the host, port, and token by hand.
+                then scan the QR or enter the host, port, and token by hand. Away from home,
+                put Odysseus behind HTTPS (<Text style={styles.mono}>tailscale serve</Text>,
+                Caddy) and turn on <Text style={styles.bold}>Use HTTPS</Text> when you pair.
               </>
             }
           />
@@ -200,9 +246,46 @@ export default function PairScreen() {
       ) : (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Field testID="pair-host" label="Host / IP" value={host} onChangeText={setHost} placeholder="192.168.1.50" autoCapitalize="none" keyboardType="numbers-and-punctuation" />
-            <Field testID="pair-port" label="Port" value={port} onChangeText={setPort} placeholder="7000" keyboardType="number-pad" />
+            <Field
+              testID="pair-host"
+              label="Host / IP"
+              value={host}
+              onChangeText={setHost}
+              placeholder={tls ? 'odysseus.tail1234.ts.net' : '192.168.1.50'}
+              autoCapitalize="none"
+              autoCorrect={false}
+              // `url`, not `numbers-and-punctuation`: that keyboard has no letters,
+              // so it can't type a hostname — and a hostname is what Tailscale and
+              // mDNS users need (see the hint below).
+              keyboardType="url"
+            />
+            <Field testID="pair-port" label="Port" value={port} onChangeText={setPort} placeholder={tls ? TLS_PORT : LAN_PORT} keyboardType="number-pad" />
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.fieldLabel}>Use HTTPS</Text>
+                <Text style={styles.hint}>
+                  For a server behind a TLS proxy (<Text style={styles.mono}>tailscale serve</Text>,
+                  Caddy, nginx). Required to reach it from outside your Wi-Fi — iOS blocks
+                  plain <Text style={styles.mono}>http://</Text> to anything but the local network.
+                </Text>
+              </View>
+              <Switch
+                testID="pair-tls"
+                value={tls}
+                onValueChange={toggleTls}
+                trackColor={{ true: theme.color.accentDim, false: theme.color.surfaceAlt }}
+                thumbColor={tls ? theme.color.accent : theme.color.textFaint}
+                accessibilityLabel="Use HTTPS"
+              />
+            </View>
             <Field testID="pair-token" label="Token" value={token} onChangeText={setToken} placeholder="ody_…" autoCapitalize="none" secureTextEntry />
+            {!tls && (
+              <Text style={styles.hint}>
+                On Tailscale, type the machine name (<Text style={styles.mono}>my-mac</Text>) rather
+                than its <Text style={styles.mono}>100.x.y.z</Text> address — iOS refuses cleartext
+                to that range even though the name resolves to it.
+              </Text>
+            )}
             <Pressable
               testID="pair-connect"
               style={({ pressed }) => [
@@ -211,7 +294,7 @@ export default function PairScreen() {
                 pressed && !busy && { opacity: 0.85 },
               ]}
               disabled={busy}
-              onPress={() => tryPair(manualPairing(host, port, token))}
+              onPress={() => tryPair(manualPairing(host, port, token, tls))}
             >
               {busy ? <ActivityIndicator color={theme.color.onAccent} /> : <Text style={styles.primaryText}>Connect</Text>}
             </Pressable>
@@ -339,6 +422,9 @@ const styles = StyleSheet.create({
   form: { padding: theme.space(6), gap: theme.space(4.5) },
   fieldWrap: { gap: theme.space(1.5) },
   fieldLabel: { color: theme.color.textDim, fontSize: theme.font.small, fontWeight: '600' },
+  switchRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space(3.5) },
+  switchLabel: { flex: 1, gap: theme.space(1.5) },
+  hint: { color: theme.color.textFaint, fontSize: theme.font.small, lineHeight: 19 },
   input: {
     backgroundColor: theme.color.surface,
     borderWidth: 1,

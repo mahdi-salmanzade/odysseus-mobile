@@ -19,7 +19,14 @@ import * as Network from 'expo-network';
 import { setRelocateHandler, setUnauthorizedHandler } from '@/lib/api';
 import { discoverServerHost } from '@/lib/discover';
 import { dlog } from '@/lib/log';
-import { clearPairing, isLanHost, loadPairing, savePairing, type Pairing } from '@/lib/pairing';
+import {
+  clearPairing,
+  isPairableHost,
+  loadPairing,
+  savePairing,
+  splitScheme,
+  type Pairing,
+} from '@/lib/pairing';
 import { disablePushForPairing, enablePushForPairing } from '@/lib/push';
 
 interface PairingContextValue {
@@ -36,9 +43,10 @@ interface PairingContextValue {
   /**
    * Manually point the existing pairing at a new address (keeps the token).
    * For when the IP changed and you know the new one — no re-scan, no re-entering
-   * the token. Returns false if the host/port are invalid.
+   * the token. `tls` switches transport (http ↔ https); omit it to keep the
+   * pairing's current one. Returns false if the host/port are invalid.
    */
-  setAddress: (host: string, port: number) => Promise<boolean>;
+  setAddress: (host: string, port: number, tls?: boolean) => Promise<boolean>;
 }
 
 const PairingContext = createContext<PairingContextValue | null>(null);
@@ -169,16 +177,20 @@ export function PairingProvider({ children }: { children: ReactNode }) {
         dlog('pair', `relocate: scanning for server (was ${pairing.host})`);
         return (await runRelocate()) !== null;
       },
-      setAddress: async (host, port) => {
+      setAddress: async (host, port, tls) => {
         if (!pairing) return false;
-        const h = host.trim();
-        if (!isLanHost(h) || !Number.isInteger(port) || port < 1 || port > 65535) {
+        const parsed = splitScheme(host);
+        const h = parsed.host;
+        const secure = parsed.tls ?? tls ?? pairing.tls ?? false;
+        if (!isPairableHost(h, secure) || !Number.isInteger(port) || port < 1 || port > 65535) {
           dlog('pair', `setAddress: rejected ${h}:${port}`);
           return false;
         }
-        const next = { ...pairing, host: h, port };
+        const next: Pairing = { ...pairing, host: h, port };
+        if (secure) next.tls = true;
+        else delete next.tls;
         await savePairing(next);
-        dlog('pair', `setAddress: ${pairing.host}:${pairing.port} → ${h}:${port}`);
+        dlog('pair', `setAddress: ${pairing.host}:${pairing.port} → ${h}:${port} (tls=${secure})`);
         setPairing(next); // re-runs screens' pairing-keyed effects → reconnect
         return true;
       },

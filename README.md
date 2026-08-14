@@ -88,14 +88,15 @@ note goes a long way toward deciding what comes next. ❤️
 ## How it works
 
 The phone authenticates to your Odysseus server with an `ody_` API token and
-talks to it directly over the LAN. Pairing data — `{ host, port, token }` — is
-stored only on-device in the iOS/Android keychain (`expo-secure-store`).
+talks to it directly — over the LAN, or over HTTPS to a server behind a TLS
+proxy. Pairing data — `{ host, port, token, tls? }` — is stored only on-device
+in the iOS/Android keychain (`expo-secure-store`).
 
 ```
- ┌─────────────┐    Wi-Fi / LAN     ┌──────────────────────────┐
- │  Odysseus    │  http://ip:7000    │  Odysseus Mobile (Expo)  │
- │  Mobile app  │ ◀───────────────▶ │  pair → chat → stream    │
- └─────────────┘   Bearer ody_…     └──────────────────────────┘
+ ┌─────────────┐  http:// on the LAN  ┌──────────────────────────┐
+ │  Odysseus    │  https:// off it     │  Odysseus Mobile (Expo)  │
+ │  server      │ ◀─────────────────▶ │  pair → chat → stream    │
+ └─────────────┘    Bearer ody_…      └──────────────────────────┘
 ```
 
 Model discovery uses Odysseus's **companion bridge** (`/api/companion/*`);
@@ -105,11 +106,39 @@ sessions and streaming chat use the stock Odysseus API (`/api/session`,
 ## Prerequisites
 
 1. **Odysseus running with the companion bridge** (the `companion/` package and
-   `/api/companion/*` routes).
+   `/api/companion/*` routes) — see [Companion bridge](#companion-bridge) for
+   what upstream ships today and where the rest lives.
 2. **Server reachable on your LAN** — bind to `0.0.0.0`, not just loopback:
    - Docker: set `APP_BIND=0.0.0.0` in `.env`, `docker compose up -d`.
    - Native: launch with `--host 0.0.0.0`.
-3. Phone and server on the **same network**.
+3. Phone and server on the **same network** — or reachable over HTTPS, see
+   [Remote access](#remote-access-tailscale-wireguard-reverse-proxy).
+
+## Companion bridge
+
+The app talks to stock Odysseus routes for chat (`/api/session`,
+`/api/chat_stream`) and to a **companion bridge** for everything else. Upstream
+`main` currently ships `ping`, `info`, `models` and `pair`; the feature tabs
+(Memory, Notes, Tasks, Gallery, Calendar, Documents, Email, Skills), push, and
+the Build 11 task controls come from the additive `companion/` modules on the
+fork **[`mahdi-salmanzade/odysseus`](https://github.com/mahdi-salmanzade/odysseus)**,
+where they're staged as one branch per PR to upstream:
+
+| Branch | Adds |
+| --- | --- |
+| `companion-readonly`, `companion-data-writes` | notes / tasks / memory read + write |
+| `companion-research` | Deep Research launcher |
+| `feat/companion-mobile-read`, `feat/companion-mobile-write` | documents, gallery, calendar, email, skills, assistant |
+| `feat/companion-mobile-admin` | admin tools (terminal, contacts, vault, MCP, cookbook) |
+| `feat/companion-mobile-push` | push delivery to a paired phone |
+| `feat/companion-update-db-export` | update-check + DB export |
+
+A consolidated branch, rebased onto current upstream `main`, is in progress on
+that fork — it will also carry `POST /api/companion/upload` and the task
+controls (`/api/companion/tasks/{id}/{run,pause,resume,stop}`), which the app
+calls but which aren't in any published branch yet. Until it lands, those two
+endpoints 404 and the affected controls are inert; everything else works from
+the branches above.
 
 ## Pairing
 
@@ -125,6 +154,31 @@ token). Or mint a code from the terminal:
 ```bash
 python scripts/pair_mobile.py
 ```
+
+## Remote access (Tailscale, WireGuard, reverse proxy)
+
+To reach your server from outside the house, put Odysseus behind TLS and turn on
+**Use HTTPS** when you pair (or paste a full `https://…` address into the host
+field — the scheme is picked up automatically). With `tailscale serve`:
+
+```bash
+tailscale serve --bg 7000          # → https://<machine>.<tailnet>.ts.net
+```
+
+then pair with host `<machine>.<tailnet>.ts.net`, port `443`, HTTPS on.
+
+**Why HTTPS and not plain `http://` over the tailnet:** iOS App Transport
+Security only exempts *local* addresses. Tailscale hands out `100.64.0.0/10`
+(CGNAT), which isn't in that exemption, and ATS exception entries are keyed by
+domain — a CIDR range can't be expressed at all — so `http://100.x.y.z:7000`
+fails with `NSURLErrorDomain -1022` before the request leaves the phone. TLS
+sidesteps it entirely, and the certificate authenticates the server rather than
+trusting a bare IP. Android is unaffected (`usesCleartextTraffic`), but the
+HTTPS path works there too.
+
+If you'd rather stay on cleartext over a tailnet, use the **MagicDNS machine
+name** (`my-mac`, no dots) instead of the `100.x` literal — single-label hosts
+*are* covered by the ATS local-networking exemption, and the app accepts them.
 
 ## Develop
 
@@ -201,7 +255,14 @@ and still pair manually and chat by typing.
 The pairing token grants chat access to your Odysseus. It lives only in this
 device's keychain and is sent as a Bearer token over your LAN. Revoke it anytime
 in **Odysseus → Settings → API tokens**. For access beyond a trusted home
-network, put Odysseus behind HTTPS (see the Odysseus README).
+network, put Odysseus behind HTTPS — see
+[Remote access](#remote-access-tailscale-wireguard-reverse-proxy).
+
+A scanned QR is untrusted input, so the host it carries is validated before the
+token is ever sent to it: cleartext pairings are restricted to private, loopback,
+link-local, CGNAT, `*.local` and single-label hosts, and an https pairing to a
+host outside those ranges asks for confirmation first. Either way the address
+must be a bare host — scheme, path, credential and port injections are rejected.
 
 ## License
 

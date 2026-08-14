@@ -166,8 +166,14 @@ export interface Preset {
   enabled?: boolean;
 }
 
+/**
+ * Every request goes through here, so the pairing's transport is honoured
+ * everywhere at once: plain `http://` on the LAN, `https://` when the server
+ * sits behind a TLS reverse proxy (the only way in from outside the LAN — iOS
+ * ATS blocks cleartext to anything that isn't a local address).
+ */
 function baseUrl(p: Pairing): string {
-  return `http://${p.host}:${p.port}`;
+  return `${p.tls ? 'https' : 'http'}://${p.host}:${p.port}`;
 }
 
 function authHeaders(p: Pairing): Record<string, string> {

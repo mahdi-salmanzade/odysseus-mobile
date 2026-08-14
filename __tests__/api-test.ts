@@ -77,6 +77,17 @@ describe('request building', () => {
     expect(init.headers.Authorization).toBe('Bearer ody_abcdefgh');
   });
 
+  test('a tls pairing addresses the server over https', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse({ ok: true, name: 'odysseus', version: '1.2.3' }),
+    );
+
+    await ping({ v: 1, host: 'box.tail1234.ts.net', port: 443, token: 'ody_abcdefgh', tls: true });
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe('https://box.tail1234.ts.net:443/api/companion/ping');
+  });
+
   test('createSession posts a urlencoded form with skip_validation', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       jsonResponse({ id: 's1', name: 'Mobile chat', model: 'gpt', rag: false, archived: false }),

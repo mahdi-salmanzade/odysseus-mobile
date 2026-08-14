@@ -51,9 +51,14 @@ async function probe(url: string, init: RequestInit, timeoutMs: number): Promise
 }
 
 /** Does this host identify as our Odysseus when we send the token? */
-async function isOurServer(host: string, port: number, token: string): Promise<boolean> {
+async function isOurServer(
+  host: string,
+  port: number,
+  token: string,
+  tls = false,
+): Promise<boolean> {
   const res = await probe(
-    `http://${host}:${port}/api/companion/ping`,
+    `${tls ? 'https' : 'http'}://${host}:${port}/api/companion/ping`,
     { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
     PROBE_TIMEOUT_MS,
   );
@@ -72,13 +77,22 @@ async function isOurServer(host: string, port: number, token: string): Promise<b
  * IP may not have changed), then sweeps the /24.
  */
 export async function discoverServerHost(pairing: Pairing): Promise<string | null> {
-  const { host: storedHost, port, token } = pairing;
-  dlog('scan', `start — stored host ${storedHost}:${port}`);
+  const { host: storedHost, port, token, tls } = pairing;
+  dlog('scan', `start — stored host ${tls ? 'https' : 'http'}://${storedHost}:${port}`);
 
-  // Cheap first: maybe the stored IP still works (failure was transient).
-  if (await isOurServer(storedHost, port, token)) {
+  // Cheap first: maybe the stored address still works (failure was transient).
+  if (await isOurServer(storedHost, port, token, tls)) {
     dlog('scan', `stored host still works: ${storedHost}`);
     return storedHost;
+  }
+
+  // An https pairing points at a name (Tailscale MagicDNS, a reverse-proxy
+  // vhost), not a DHCP lease that moves — and the server generally isn't on this
+  // subnet at all. Sweeping the /24 could only find some *other* box and would
+  // then rewrite the host out from under a certificate that no longer matches.
+  if (tls) {
+    dlog('scan', 'https pairing — no LAN sweep (host is a name, not a leased IP)');
+    return null;
   }
 
   const net = await deviceSubnet();

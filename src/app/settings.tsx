@@ -165,7 +165,9 @@ export default function SettingsScreen() {
 
   function startEditAddr() {
     if (!pairing) return;
-    setHostIn(pairing.host);
+    // Show the scheme when it isn't the default, so the field round-trips: an
+    // https pairing that's edited back in stays https.
+    setHostIn(pairing.tls ? `https://${pairing.host}` : pairing.host);
     setPortIn(String(pairing.port));
     setEditAddr(true);
   }
@@ -177,7 +179,10 @@ export default function SettingsScreen() {
     try {
       const ok = await setAddress(hostIn, port);
       if (!ok) {
-        Alert.alert('Invalid address', 'Enter a LAN IP/host (e.g. 192.168.1.21) and a port from 1–65535.');
+        Alert.alert(
+          'Invalid address',
+          'Enter a LAN IP/host (e.g. 192.168.1.21), or a full https:// address for a server behind a TLS proxy, plus a port from 1–65535.',
+        );
         return;
       }
       Haptics.selectionAsync().catch(() => {});
@@ -242,8 +247,8 @@ export default function SettingsScreen() {
                   onChangeText={setHostIn}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  keyboardType="numbers-and-punctuation"
-                  placeholder="192.168.1.21"
+                  keyboardType="url"
+                  placeholder="192.168.1.21 or https://box.tail1234.ts.net"
                   placeholderTextColor={theme.color.textFaint}
                   accessibilityLabel="Server IP or host"
                 />
@@ -281,7 +286,14 @@ export default function SettingsScreen() {
               </View>
             ) : (
               <>
-                <Row labelKey="settings.host" value={pairing ? `${pairing.host}:${pairing.port}` : '—'} />
+                <Row
+                  labelKey="settings.host"
+                  value={
+                    pairing
+                      ? `${pairing.tls ? 'https://' : ''}${pairing.host}:${pairing.port}`
+                      : '—'
+                  }
+                />
                 <Row
                   labelKey="settings.server"
                   value={info ? `${info.name} ${info.version}` : tokenRejected ? t('settings.tokenRejected') : '…'}

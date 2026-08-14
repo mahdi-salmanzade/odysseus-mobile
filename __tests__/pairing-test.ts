@@ -10,11 +10,14 @@ import * as SecureStore from 'expo-secure-store';
 
 import {
   isLanHost,
+  isPairableHost,
+  isTlsHost,
   parsePairingPayload,
   manualPairing,
   savePairing,
   loadPairing,
   clearPairing,
+  splitScheme,
   type Pairing,
 } from '@/lib/pairing';
 
@@ -71,6 +74,50 @@ describe('isLanHost', () => {
   });
 });
 
+describe('isTlsHost / isPairableHost', () => {
+  test.each([
+    'box.tail1234.ts.net', // Tailscale MagicDNS FQDN behind `tailscale serve`
+    'odysseus.example.com', // a reverse-proxy vhost
+    'my-mac', // bare MagicDNS label
+    'nas.local', // mDNS
+    '203.0.113.7', // public IP literal with a cert in front
+  ])('an https pairing accepts %s', (h) => {
+    expect(isTlsHost(h)).toBe(true);
+    expect(isPairableHost(h, true)).toBe(true);
+  });
+
+  test.each([
+    'https://box.ts.net', // scheme — URL injection
+    'evil.com/path', // path
+    'user@evil.com', // credentials
+    'evil.com:443', // embedded port
+    'box .ts.net', // whitespace
+    '', // empty
+    '256.1.1.1', // not a valid IP literal
+  ])('rejects injection shape %s even over https', (h) => {
+    expect(isTlsHost(h)).toBe(false);
+    expect(isPairableHost(h, true)).toBe(false);
+  });
+
+  test('cleartext stays LAN-only — the https allowance does not leak into http', () => {
+    expect(isPairableHost('box.tail1234.ts.net', false)).toBe(false);
+    expect(isPairableHost('box.tail1234.ts.net', undefined)).toBe(false);
+    expect(isLanHost('box.tail1234.ts.net')).toBe(false);
+  });
+});
+
+describe('splitScheme', () => {
+  test.each([
+    ['https://box.ts.net', { host: 'box.ts.net', tls: true }],
+    ['http://192.168.1.50', { host: '192.168.1.50', tls: false }],
+    ['HTTPS://Box.ts.net/', { host: 'Box.ts.net', tls: true }],
+    ['  https://box.ts.net//  ', { host: 'box.ts.net', tls: true }],
+    ['192.168.1.50', { host: '192.168.1.50', tls: undefined }],
+  ])('splits %s', (raw, expected) => {
+    expect(splitScheme(raw)).toEqual(expected);
+  });
+});
+
 describe('parsePairingPayload', () => {
   test('parses a valid JSON payload', () => {
     expect(parsePairingPayload(JSON.stringify(VALID))).toEqual(VALID);
@@ -83,6 +130,31 @@ describe('parsePairingPayload', () => {
 
   test('tolerates surrounding whitespace', () => {
     expect(parsePairingPayload(`  ${JSON.stringify(VALID)}\n`)).toEqual(VALID);
+  });
+
+  test('accepts a remote host when the payload asks for tls', () => {
+    const raw = JSON.stringify({ ...VALID, host: 'box.tail1234.ts.net', port: 443, tls: true });
+    expect(parsePairingPayload(raw)).toEqual({
+      v: 1,
+      host: 'box.tail1234.ts.net',
+      port: 443,
+      token: VALID.token,
+      tls: true,
+    });
+  });
+
+  test('coerces a stringified tls flag', () => {
+    const raw = JSON.stringify({ ...VALID, host: 'box.ts.net', port: 443, tls: 'true' });
+    expect(parsePairingPayload(raw)?.tls).toBe(true);
+  });
+
+  test('drops a falsy tls flag rather than storing it', () => {
+    expect(parsePairingPayload(JSON.stringify({ ...VALID, tls: false }))).toEqual(VALID);
+    expect(parsePairingPayload(JSON.stringify({ ...VALID, tls: 'no' }))).toEqual(VALID);
+  });
+
+  test('rejects a remote host without tls (cleartext to the internet)', () => {
+    expect(parsePairingPayload(JSON.stringify({ ...VALID, host: 'evil.com' }))).toBeNull();
   });
 
   test.each([
@@ -112,6 +184,39 @@ describe('manualPairing', () => {
 
   test('returns null for a non-numeric port', () => {
     expect(manualPairing('10.0.0.1', 'abc', 'ody_abcdefgh')).toBeNull();
+  });
+
+  test('builds an https pairing when the toggle is on', () => {
+    expect(manualPairing('box.tail1234.ts.net', '443', 'ody_abcdefgh', true)).toEqual({
+      v: 1,
+      host: 'box.tail1234.ts.net',
+      port: 443,
+      token: 'ody_abcdefgh',
+      tls: true,
+    });
+  });
+
+  test('a pasted https:// URL turns on tls and is stripped from the host', () => {
+    expect(manualPairing('https://box.ts.net/', '443', 'ody_abcdefgh')).toEqual({
+      v: 1,
+      host: 'box.ts.net',
+      port: 443,
+      token: 'ody_abcdefgh',
+      tls: true,
+    });
+  });
+
+  test('a typed scheme overrides the toggle', () => {
+    // http:// with the HTTPS switch on → cleartext rules apply, so a remote host
+    // is refused rather than silently upgraded.
+    expect(manualPairing('http://box.ts.net', '443', 'ody_abcdefgh', true)).toBeNull();
+    expect(manualPairing('http://192.168.1.50', '7000', 'ody_abcdefgh', true)).toEqual(VALID);
+  });
+
+  test('does not store tls:false for a plain LAN pairing', () => {
+    const p = manualPairing('192.168.1.50', '7000', 'ody_abcdefgh', false);
+    expect(p).toEqual(VALID);
+    expect('tls' in (p as object)).toBe(false);
   });
 });
 
