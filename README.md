@@ -6,7 +6,7 @@
 
 **Version 1.0.0 · Build 12**
 
-A native iOS/Android remote for [**Odysseus**](https://github.com/pewdiepie-archdaemon/odysseus),
+A native iOS/Android remote for [**Odysseus**](https://github.com/odysseus-dev/odysseus),
 the self-hosted AI workspace. Run Odysseus on a machine at home, pair your phone
 over the same Wi-Fi, and chat with your own models — local-first, nothing leaves
 your network.
@@ -61,8 +61,8 @@ and install it (allow *install from unknown sources* if prompted).
   address. See [Remote access](#remote-access-tailscale-wireguard-reverse-proxy).
   Reported in [#2](https://github.com/mahdi-salmanzade/odysseus-mobile/issues/2)
   by [@FUenal](https://github.com/FUenal) — thank you.
-- **Clearer setup docs** — the README now says which companion-bridge branch
-  provides which `/api/companion/*` endpoints, and which two aren't published yet.
+- **Clearer setup docs** — the README now points at the single consolidated
+  companion-bridge PR and says exactly which screen isn't available upstream.
 
 ## What's new in Build 11
 
@@ -77,7 +77,9 @@ and install it (allow *install from unknown sources* if prompted).
 - **Gallery favorites** — add or remove a favorite from the image viewer.
 - **Email AI** — summarize a message or draft a reply with your own model.
 - **Cached model browser** — inspect the server's model inventory from
-  **Admin → Cookbook**.
+  **Admin → Cookbook**. (Admin-only; see
+  [Companion bridge](#companion-bridge) — not available against an upstream
+  server.)
 
 All of these features remain owner-scoped and local-first: the app communicates
 only with the Odysseus server you paired over your network. See the full
@@ -86,7 +88,7 @@ only with the Odysseus server you paired over your network. See the full
 ## A note to the community (and to PewDiePie) 🙏
 
 Huge thanks to **PewDiePie** for building and open-sourcing
-[Odysseus](https://github.com/pewdiepie-archdaemon/odysseus) — a genuinely
+[Odysseus](https://github.com/odysseus-dev/odysseus) — a genuinely
 local-first, privacy-first AI workspace, with no Trojan horse. This little app
 exists only because that one does. Thank you, Felix. 🛶
 
@@ -129,27 +131,47 @@ sessions and streaming chat use the stock Odysseus API (`/api/session`,
 
 The app talks to stock Odysseus routes for chat (`/api/session`,
 `/api/chat_stream`) and to a **companion bridge** for everything else. Upstream
-`main` currently ships `ping`, `info`, `models` and `pair`; the feature tabs
-(Memory, Notes, Tasks, Gallery, Calendar, Documents, Email, Skills), push, and
-the Build 11 task controls come from the additive `companion/` modules on the
-fork **[`mahdi-salmanzade/odysseus`](https://github.com/mahdi-salmanzade/odysseus)**,
-where they're staged as one branch per PR to upstream:
+already ships `ping`, `info`, `models` and `pair` (merged as
+[#863](https://github.com/odysseus-dev/odysseus/pull/863),
+[#871](https://github.com/odysseus-dev/odysseus/pull/871),
+[#877](https://github.com/odysseus-dev/odysseus/pull/877)). Everything else —
+the feature tabs (Memory, Notes, Tasks, Gallery, Calendar, Documents, Email,
+Skills), the Deep Research launcher, and push — is proposed upstream as a single
+consolidated PR:
 
-| Branch | Adds |
-| --- | --- |
-| `companion-readonly`, `companion-data-writes` | notes / tasks / memory read + write |
-| `companion-research` | Deep Research launcher |
-| `feat/companion-mobile-read`, `feat/companion-mobile-write` | documents, gallery, calendar, email, skills, assistant |
-| `feat/companion-mobile-admin` | admin tools (terminal, contacts, vault, MCP, cookbook) |
-| `feat/companion-mobile-push` | push delivery to a paired phone |
-| `feat/companion-update-db-export` | update-check + DB export |
+> **[odysseus-dev/odysseus#6038](https://github.com/odysseus-dev/odysseus/pull/6038)** —
+> `feat(companion): owner-scoped mobile surface`, from the fork
+> **[`mahdi-salmanzade/odysseus-dev`](https://github.com/mahdi-salmanzade/odysseus-dev)**
+> (branch `feat/companion-mobile-surface`).
 
-A consolidated branch, rebased onto current upstream `main`, is in progress on
-that fork — it will also carry `POST /api/companion/upload` and the task
-controls (`/api/companion/tasks/{id}/{run,pause,resume,stop}`), which the app
-calls but which aren't in any published branch yet. Until it lands, those two
-endpoints 404 and the affected controls are inert; everything else works from
-the branches above.
+That one branch replaces the earlier one-branch-per-PR layout. The ten
+predecessor PRs (#881, #1094, #1166, #1332, #1366, #2585, #2668, #2672, #2674,
+#2966) were all closed on 2026-07-23 when GitHub detached the upstream
+repository from its fork network — not on review — so they were rebuilt from
+scratch on current `dev` with every review round folded in.
+
+**Until #6038 lands, run the bridge from that branch** (the old
+`mahdi-salmanzade/odysseus` fork is orphaned in a different fork network and is
+no longer updated):
+
+```bash
+git clone https://github.com/mahdi-salmanzade/odysseus-dev.git odysseus
+cd odysseus && git checkout feat/companion-mobile-surface
+```
+
+Every non-admin endpoint the app calls is served by that branch — attachments,
+task controls, gallery favorites and the email AI actions included — so no
+feature tab is inert.
+
+### The one screen that stays unavailable
+
+The **Admin** screen (`/terminal/exec`, `/vault/*`, `/mcp/servers`,
+`/cookbook/*`, `/contacts`, `/admin/status`) is **deliberately not** part of the
+upstream proposal, and those calls 404. A paired device is narrow integration
+access and shouldn't inherit an admin account's shell — so the bridge exposes no
+admin-privileged tool at all, and a test enforces that. If you want those
+locally, they live on the `integration` branch of the fork; running them is a
+decision to hand your phone's token an admin surface.
 
 ## Pairing
 
@@ -206,7 +228,7 @@ npx expo start
 ## Server setup & TestFlight
 
 - **Setting up the server + connecting your phone:** see
-  [`MOBILE_SETUP.md`](https://github.com/pewdiepie-archdaemon/odysseus/blob/main/MOBILE_SETUP.md)
+  [`MOBILE_SETUP.md`](https://github.com/odysseus-dev/odysseus/blob/main/MOBILE_SETUP.md)
   on the Odysseus server side.
 - **Building for TestFlight / the App Store:** see [`TESTFLIGHT.md`](TESTFLIGHT.md).
 
