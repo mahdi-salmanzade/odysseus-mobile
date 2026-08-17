@@ -11,6 +11,36 @@ the self-hosted AI workspace. Run Odysseus on a machine at home, pair your phone
 over the same Wi-Fi, and chat with your own models — local-first, nothing leaves
 your network.
 
+> ## ⚠️ Read this first — upstream refused the companion bridge
+>
+> On **2026-08-17** the Odysseus maintainers **closed the companion-bridge PR**,
+> [#6038](https://github.com/odysseus-dev/odysseus/pull/6038) — the server-side
+> half this app is built on.
+> **[→ Read the closing comment](https://github.com/odysseus-dev/odysseus/pull/6038#issuecomment-5316170737)**
+>
+> It was not closed for bugs. It was green, mergeable, 4,000 reviewed lines, with
+> every prior review round folded in. It was closed because core "[has] not agreed
+> to maintain an app-specific companion API," a question left unresolved in
+> [#3244](https://github.com/odysseus-dev/odysseus/issues/3244) since July — while
+> [#5674](https://github.com/odysseus-dev/odysseus/issues/5674) and
+> [#5810](https://github.com/odysseus-dev/odysseus/pull/5810) propose deleting the
+> part of the bridge that upstream **already merged** in June. A separate PR simply
+> *listing* this app in the README was closed the same week,
+> [#6044](https://github.com/odysseus-dev/odysseus/pull/6044) —
+> [that comment](https://github.com/odysseus-dev/odysseus/pull/6044#issuecomment-5310415195).
+>
+> **What this means for you, concretely.** A stock upstream Odysseus serves **4**
+> of the ~50 companion endpoints this app calls — `ping`, `info`, `models`, `pair`.
+> So against an official server you get pairing and chat, and **every other screen
+> is dead**: Notes, Tasks, Memory, Gallery, Calendar, Documents, Email, Skills,
+> Deep Research and push all return 404. And if #5810 is merged, those last four go
+> too — the app **won't even pair**, and nothing works at all.
+>
+> **So don't run stock upstream.** Run the server branch that actually carries the
+> bridge — one clone, see **[Companion bridge](#companion-bridge)**. Everything in
+> this app works against it, today. The app itself is finished and not blocked by
+> any of this.
+
 Built with **Expo SDK 56** (React Native 0.85, React 19, expo-router).
 
 Runs natively on **iPhone and iPad** from a single universal build — the iPad
@@ -61,8 +91,8 @@ and install it (allow *install from unknown sources* if prompted).
   address. See [Remote access](#remote-access-tailscale-wireguard-reverse-proxy).
   Reported in [#2](https://github.com/mahdi-salmanzade/odysseus-mobile/issues/2)
   by [@FUenal](https://github.com/FUenal) — thank you.
-- **Clearer setup docs** — the README now points at the single consolidated
-  companion-bridge PR and says exactly which screen isn't available upstream.
+- **Clearer setup docs** — the README now says plainly where the companion bridge
+  lives, why it isn't in upstream core, and which screen the bridge doesn't serve.
 
 ## What's new in Build 11
 
@@ -119,8 +149,8 @@ sessions and streaming chat use the stock Odysseus API (`/api/session`,
 ## Prerequisites
 
 1. **Odysseus running with the companion bridge** (the `companion/` package and
-   `/api/companion/*` routes) — see [Companion bridge](#companion-bridge) for
-   what upstream ships today and where the rest lives.
+   `/api/companion/*` routes) — see [Companion bridge](#companion-bridge) for the
+   one-line clone that gets you a server with it.
 2. **Server reachable on your LAN** — bind to `0.0.0.0`, not just loopback:
    - Docker: set `APP_BIND=0.0.0.0` in `.env`, `docker compose up -d`.
    - Native: launch with `--host 0.0.0.0`.
@@ -130,48 +160,60 @@ sessions and streaming chat use the stock Odysseus API (`/api/session`,
 ## Companion bridge
 
 The app talks to stock Odysseus routes for chat (`/api/session`,
-`/api/chat_stream`) and to a **companion bridge** for everything else. Upstream
-already ships `ping`, `info`, `models` and `pair` (merged as
-[#863](https://github.com/odysseus-dev/odysseus/pull/863),
-[#871](https://github.com/odysseus-dev/odysseus/pull/871),
-[#877](https://github.com/odysseus-dev/odysseus/pull/877)). Everything else —
-the feature tabs (Memory, Notes, Tasks, Gallery, Calendar, Documents, Email,
-Skills), the Deep Research launcher, and push — is proposed upstream as a single
-consolidated PR:
-
-> **[odysseus-dev/odysseus#6038](https://github.com/odysseus-dev/odysseus/pull/6038)** —
-> `feat(companion): owner-scoped mobile surface`, from the fork
-> **[`mahdi-salmanzade/odysseus-dev`](https://github.com/mahdi-salmanzade/odysseus-dev)**
-> (branch `feat/companion-mobile-surface`).
-
-That one branch replaces the earlier one-branch-per-PR layout. The ten
-predecessor PRs (#881, #1094, #1166, #1332, #1366, #2585, #2668, #2672, #2674,
-#2966) were all closed on 2026-07-23 when GitHub detached the upstream
-repository from its fork network — not on review — so they were rebuilt from
-scratch on current `dev` with every review round folded in.
-
-**Until #6038 lands, run the bridge from that branch** (the old
-`mahdi-salmanzade/odysseus` fork is orphaned in a different fork network and is
-no longer updated):
+`/api/chat_stream`) and to a **companion bridge** for everything else. The bridge
+lives in **this project's fork**, and that is now its long-term home.
 
 ```bash
 git clone https://github.com/mahdi-salmanzade/odysseus-dev.git odysseus
 cd odysseus && git checkout feat/companion-mobile-surface
 ```
 
-Every non-admin endpoint the app calls is served by that branch — attachments,
-task controls, gallery favorites and the email AI actions included — so no
-feature tab is inert.
+That branch is current `dev` plus the bridge, and it serves **every** non-admin
+endpoint the app calls — the feature tabs (Memory, Notes, Tasks, Gallery,
+Calendar, Documents, Email, Skills), the Deep Research launcher, attachments,
+task controls, gallery favorites, email AI actions and push. Nothing in the app
+is inert against it.
+
+### Why it isn't upstream
+
+A first slice of the bridge — `ping`, `info`, `models`, `pair` — *was* merged
+upstream in June ([#863](https://github.com/odysseus-dev/odysseus/pull/863),
+[#871](https://github.com/odysseus-dev/odysseus/pull/871),
+[#877](https://github.com/odysseus-dev/odysseus/pull/877)). The rest was offered
+as one consolidated PR,
+[#6038](https://github.com/odysseus-dev/odysseus/pull/6038), and **closed on
+2026-08-17**. The reason given was scope, not defects: the project has not agreed
+to maintain an app-specific companion API in core, that question is still open in
+[#3244](https://github.com/odysseus-dev/odysseus/issues/3244), and two other
+proposals — [#5674](https://github.com/odysseus-dev/odysseus/issues/5674) and
+[#5810](https://github.com/odysseus-dev/odysseus/pull/5810) — argue for removing
+the merged bridge instead. A README entry listing this app alongside the other
+community client was closed the same week under a policy against pointing at
+third-party clients from the official docs.
+
+So the direction upstream is unsettled, and the four merged endpoints may yet be
+removed by #5810. **That changes nothing for you as a user:** the fork branch
+above is self-contained, tracks `dev`, and carries the merged endpoints too — so
+it keeps working either way. If core later adopts a companion API, this app will
+follow it.
+
+Historical note: ten predecessor PRs (#881, #1094, #1166, #1332, #1366, #2585,
+#2668, #2672, #2674, #2966) were closed on 2026-07-23 when GitHub detached the
+upstream repository from its fork network — not on review — and were rebuilt from
+scratch on current `dev` with every review round folded in. The old
+`mahdi-salmanzade/odysseus` fork is orphaned in that other network and is no
+longer updated; use `odysseus-dev` above.
 
 ### The one screen that stays unavailable
 
 The **Admin** screen (`/terminal/exec`, `/vault/*`, `/mcp/servers`,
 `/cookbook/*`, `/contacts`, `/admin/status`) is **deliberately not** part of the
-upstream proposal, and those calls 404. A paired device is narrow integration
-access and shouldn't inherit an admin account's shell — so the bridge exposes no
-admin-privileged tool at all, and a test enforces that. If you want those
-locally, they live on the `integration` branch of the fork; running them is a
-decision to hand your phone's token an admin surface.
+bridge, and those calls 404. A paired device is narrow integration access and
+shouldn't inherit an admin account's shell — so the bridge exposes no
+admin-privileged tool at all, and a test enforces that. This was our own call,
+and it stands regardless of what upstream decides. If you want those locally,
+they live on the `integration` branch of the fork; running them is a decision to
+hand your phone's token an admin surface.
 
 ## Pairing
 
@@ -228,8 +270,8 @@ npx expo start
 ## Server setup & TestFlight
 
 - **Setting up the server + connecting your phone:** see
-  [`MOBILE_SETUP.md`](https://github.com/odysseus-dev/odysseus/blob/main/MOBILE_SETUP.md)
-  on the Odysseus server side.
+  [`companion/README.md`](https://github.com/mahdi-salmanzade/odysseus-dev/blob/feat/companion-mobile-surface/companion/README.md)
+  on the server-side branch.
 - **Building for TestFlight / the App Store:** see [`TESTFLIGHT.md`](TESTFLIGHT.md).
 
 ## Project layout

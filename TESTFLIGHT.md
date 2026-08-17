@@ -5,7 +5,7 @@ Build** (Expo's cloud builder handles iOS signing for you) + **EAS Submit**.
 
 > **How testers use the app:** they still need an Odysseus server on their LAN and
 > a pairing code — point them at
-> [`MOBILE_SETUP.md`](https://github.com/pewdiepie-archdaemon/odysseus/blob/main/MOBILE_SETUP.md)
+> [`companion/README.md`](https://github.com/mahdi-salmanzade/odysseus-dev/blob/feat/companion-mobile-surface/companion/README.md)
 > on the server side.
 
 ## Prerequisites
