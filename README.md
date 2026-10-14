@@ -4,14 +4,27 @@
 
 # Odysseus Mobile
 
-**Version 1.0.0 · Build 12**
+**Version 1.0.0 · Build 12 (final)**
+
+> ## 🛑 This project is discontinued
+>
+> Because of the lack of collaboration from the main Odysseus repo's
+> maintainers, I've **removed the app and stopped updating this repo**. It has
+> also been **removed from TestFlight**, so the old invite link no longer works.
+>
+> But if you still need it, you can use it for yourself :) The code stays here
+> under the [MIT license](LICENSE). Build it on your own device (see
+> [Develop](#develop), or [`TESTFLIGHT.md`](TESTFLIGHT.md) for your own
+> TestFlight build) and pair it with the server branch in
+> [Companion bridge](#companion-bridge). Everything below is left as it was at
+> Build 12.
 
 A native iOS/Android remote for [**Odysseus**](https://github.com/odysseus-dev/odysseus),
 the self-hosted AI workspace. Run Odysseus on a machine at home, pair your phone
 over the same Wi-Fi, and chat with your own models — local-first, nothing leaves
 your network.
 
-> ## ⚠️ Read this first — upstream refused the companion bridge
+> ## ⚠️ Background — upstream refused the companion bridge
 >
 > On **2026-08-17** the Odysseus maintainers **closed the companion-bridge PR**,
 > [#6038](https://github.com/odysseus-dev/odysseus/pull/6038) — the server-side
@@ -64,19 +77,17 @@ gets the full app, not a stretched phone view. (iPad screenshots:
 
 ## Install
 
-### iOS — TestFlight
+### iOS — build it yourself
 
-1. Install Apple's **[TestFlight](https://apps.apple.com/app/testflight/id899247664)** app.
-2. Open **[testflight.apple.com/join/qWq1A51n](https://testflight.apple.com/join/qWq1A51n)** and tap *Install*.
-
-The **latest build (build 12)** is live on TestFlight. Please give it a spin and
-send feedback — bugs, rough edges, anything — via the
-[issues](https://github.com/mahdi-salmanzade/odysseus-mobile/issues) or
-TestFlight's built-in feedback.
+The app has been **removed from TestFlight**, so there's no public iOS install
+any more. To run it on your own iPhone or iPad, make a development build
+(`npx expo run:ios`, see [Develop](#develop)) or upload your own TestFlight build
+(see [`TESTFLIGHT.md`](TESTFLIGHT.md)).
 
 ### Android — APK
 
-Download **[`odysseus-mobile-v1.0.0-build12.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/download/v1.0.0-build.12/odysseus-mobile-v1.0.0-build12.apk)**
+The final build is still on GitHub Releases. Download
+**[`odysseus-mobile-v1.0.0-build12.apk`](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/download/v1.0.0-build.12/odysseus-mobile-v1.0.0-build12.apk)**
 from the [Build 12 release](https://github.com/mahdi-salmanzade/odysseus-mobile/releases/tag/v1.0.0-build.12)
 and install it (allow *install from unknown sources* if prompted).
 
@@ -122,11 +133,9 @@ Huge thanks to **PewDiePie** for building and open-sourcing
 local-first, privacy-first AI workspace, with no Trojan horse. This little app
 exists only because that one does. Thank you, Felix. 🛶
 
-This project is **meant to be public and free** — take it, fork it, run it. If I
-see people actually using it, I'll keep it alive: shipping the latest features,
-keeping it in step with Odysseus, and **publishing it on the App Store** so it's
-a one-tap install instead of a dev build. So if it's useful to you, a star or a
-note goes a long way toward deciding what comes next. ❤️
+This project is **public and free** — take it, fork it, run it. I'm no longer
+updating it (see the note at the top), but the code stays here, and you're
+welcome to keep it going in your own fork. ❤️
 
 ## How it works
 
@@ -161,14 +170,14 @@ sessions and streaming chat use the stock Odysseus API (`/api/session`,
 
 The app talks to stock Odysseus routes for chat (`/api/session`,
 `/api/chat_stream`) and to a **companion bridge** for everything else. The bridge
-lives in **this project's fork**, and that is now its long-term home.
+lives in **this project's fork**.
 
 ```bash
 git clone https://github.com/mahdi-salmanzade/odysseus-dev.git odysseus
 cd odysseus && git checkout feat/companion-mobile-surface
 ```
 
-That branch is current `dev` plus the bridge, and it serves **every** non-admin
+That branch is `dev` (as of its last sync) plus the bridge, and it serves **every** non-admin
 endpoint the app calls — the feature tabs (Memory, Notes, Tasks, Gallery,
 Calendar, Documents, Email, Skills), the Deep Research launcher, attachments,
 task controls, gallery favorites, email AI actions and push. Nothing in the app
@@ -193,9 +202,9 @@ third-party clients from the official docs.
 
 So the direction upstream is unsettled, and the four merged endpoints may yet be
 removed by #5810. **That changes nothing for you as a user:** the fork branch
-above is self-contained, tracks `dev`, and carries the merged endpoints too — so
-it keeps working either way. If core later adopts a companion API, this app will
-follow it.
+above is self-contained and carries the merged endpoints too — so it keeps
+working either way. This project is discontinued, though, so the app won't
+follow future upstream changes.
 
 Historical note: ten predecessor PRs (#881, #1094, #1166, #1332, #1366, #2585,
 #2668, #2672, #2674, #2966) were closed on 2026-07-23 when GitHub detached the

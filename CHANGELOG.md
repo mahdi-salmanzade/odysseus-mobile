@@ -1,5 +1,12 @@
 # Changelog
 
+## Discontinued — 2026-10-14
+
+- Removed the app and stopped updating this repo because of the lack of
+  collaboration from the main Odysseus repo's maintainers. The app has also been
+  removed from TestFlight. Build 12 is the final build; the code stays available
+  under the MIT license for anyone who wants to build it for themselves.
+
 ## Build 12 — 2026-08-14
 
 ### Remote access over HTTPS
